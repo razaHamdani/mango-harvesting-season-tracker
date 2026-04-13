@@ -10,3 +10,21 @@ export const workerSchema = z.object({
   phone: z.string().optional().or(z.literal('')),
   monthly_salary: z.coerce.number().positive('Salary must be greater than 0'),
 })
+
+const installmentSchema = z.object({
+  amount: z.coerce.number().positive('Amount must be greater than 0'),
+  due_date: z.string().min(1, 'Due date is required'),
+})
+
+export const seasonCreateSchema = z.object({
+  year: z.coerce.number().int().min(2020).max(2100),
+  contractor_name: z.string().min(1, 'Contractor name is required'),
+  contractor_phone: z.string().optional().or(z.literal('')),
+  contractor_cnic: z.string().optional().or(z.literal('')),
+  predetermined_amount: z.coerce.number().positive('Amount must be greater than 0'),
+  spray_landlord_pct: z.coerce.number().int().min(0).max(100),
+  fertilizer_landlord_pct: z.coerce.number().int().min(0).max(100),
+  agreed_boxes: z.coerce.number().int().min(0),
+  farm_ids: z.array(z.string().uuid()).min(1, 'Select at least one farm'),
+  installments: z.array(installmentSchema).min(1, 'At least one installment is required'),
+})
