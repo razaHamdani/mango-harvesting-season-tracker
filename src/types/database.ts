@@ -31,6 +31,7 @@ export interface Database {
           email?: string;
           created_at?: string;
         };
+        Relationships: [];
       };
       farms: {
         Row: {
@@ -54,6 +55,7 @@ export interface Database {
           acreage?: number;
           created_at?: string;
         };
+        Relationships: [];
       };
       seasons: {
         Row: {
@@ -101,6 +103,7 @@ export interface Database {
           created_at?: string;
           closed_at?: string | null;
         };
+        Relationships: [];
       };
       season_farms: {
         Row: {
@@ -118,6 +121,7 @@ export interface Database {
           season_id?: string;
           farm_id?: string;
         };
+        Relationships: [];
       };
       installments: {
         Row: {
@@ -156,6 +160,7 @@ export interface Database {
           notes?: string | null;
           created_at?: string;
         };
+        Relationships: [];
       };
       activities: {
         Row: {
@@ -197,6 +202,7 @@ export interface Database {
           photo_path?: string | null;
           created_at?: string;
         };
+        Relationships: [];
       };
       expenses: {
         Row: {
@@ -238,6 +244,7 @@ export interface Database {
           linked_activity_id?: string | null;
           created_at?: string;
         };
+        Relationships: [];
       };
       workers: {
         Row: {
@@ -267,6 +274,7 @@ export interface Database {
           is_active?: boolean;
           created_at?: string;
         };
+        Relationships: [];
       };
     };
     Functions: {
@@ -275,6 +283,7 @@ export interface Database {
         Returns: Json;
       };
     };
+    Views: Record<string, never>;
     Enums: Record<string, never>;
   };
 }

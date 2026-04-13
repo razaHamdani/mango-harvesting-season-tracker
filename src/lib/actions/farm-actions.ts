@@ -1,0 +1,101 @@
+'use server'
+
+import { revalidatePath } from 'next/cache'
+import { createClient } from '@/lib/supabase/server'
+import { farmSchema } from '@/lib/utils/validators'
+
+export async function createFarm(formData: FormData) {
+  const parsed = farmSchema.safeParse({
+    name: formData.get('name'),
+    acreage: formData.get('acreage'),
+  })
+
+  if (!parsed.success) {
+    return { error: parsed.error.flatten().fieldErrors }
+  }
+
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { error: { _form: ['You must be logged in.'] } }
+  }
+
+  const { error } = await supabase.from('farms').insert({
+    owner_id: user.id,
+    name: parsed.data.name,
+    acreage: parsed.data.acreage,
+  })
+
+  if (error) {
+    return { error: { _form: [error.message] } }
+  }
+
+  revalidatePath('/farms')
+  return { success: true }
+}
+
+export async function updateFarm(id: string, formData: FormData) {
+  const parsed = farmSchema.safeParse({
+    name: formData.get('name'),
+    acreage: formData.get('acreage'),
+  })
+
+  if (!parsed.success) {
+    return { error: parsed.error.flatten().fieldErrors }
+  }
+
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { error: { _form: ['You must be logged in.'] } }
+  }
+
+  const { error } = await supabase
+    .from('farms')
+    .update({
+      name: parsed.data.name,
+      acreage: parsed.data.acreage,
+    })
+    .eq('id', id)
+    .eq('owner_id', user.id)
+
+  if (error) {
+    return { error: { _form: [error.message] } }
+  }
+
+  revalidatePath('/farms')
+  return { success: true }
+}
+
+export async function deleteFarm(id: string) {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { error: { _form: ['You must be logged in.'] } }
+  }
+
+  const { error } = await supabase
+    .from('farms')
+    .delete()
+    .eq('id', id)
+    .eq('owner_id', user.id)
+
+  if (error) {
+    return { error: { _form: [error.message] } }
+  }
+
+  revalidatePath('/farms')
+  return { success: true }
+}
