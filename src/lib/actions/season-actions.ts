@@ -166,3 +166,106 @@ export async function deleteSeason(id: string) {
   revalidatePath('/seasons')
   return { success: true }
 }
+
+// TODO: updateSeason(id, data) -- placeholder for future edit form
+
+export async function activateSeason(id: string) {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { error: { _form: ['You must be logged in.'] } }
+  }
+
+  // Verify season exists and is in draft status
+  const { data: season } = await supabase
+    .from('seasons')
+    .select('status')
+    .eq('id', id)
+    .eq('owner_id', user.id)
+    .single()
+
+  if (!season) {
+    return { error: { _form: ['Season not found.'] } }
+  }
+
+  if (season.status !== 'draft') {
+    return { error: { _form: ['Only draft seasons can be activated.'] } }
+  }
+
+  // Check no other active season exists
+  const { data: activeSeason } = await supabase
+    .from('seasons')
+    .select('id')
+    .eq('owner_id', user.id)
+    .eq('status', 'active')
+    .limit(1)
+    .single()
+
+  if (activeSeason) {
+    return {
+      error: {
+        _form: ['An active season already exists. Close it before activating another.'],
+      },
+    }
+  }
+
+  const { error } = await supabase
+    .from('seasons')
+    .update({ status: 'active' })
+    .eq('id', id)
+    .eq('owner_id', user.id)
+
+  if (error) {
+    return { error: { _form: [error.message] } }
+  }
+
+  revalidatePath(`/seasons/${id}`)
+  revalidatePath('/seasons')
+  return { success: true }
+}
+
+export async function closeSeason(id: string) {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { error: { _form: ['You must be logged in.'] } }
+  }
+
+  // Verify season exists and is active
+  const { data: season } = await supabase
+    .from('seasons')
+    .select('status')
+    .eq('id', id)
+    .eq('owner_id', user.id)
+    .single()
+
+  if (!season) {
+    return { error: { _form: ['Season not found.'] } }
+  }
+
+  if (season.status !== 'active') {
+    return { error: { _form: ['Only active seasons can be closed.'] } }
+  }
+
+  const { error } = await supabase
+    .from('seasons')
+    .update({ status: 'closed', closed_at: new Date().toISOString() })
+    .eq('id', id)
+    .eq('owner_id', user.id)
+
+  if (error) {
+    return { error: { _form: [error.message] } }
+  }
+
+  revalidatePath(`/seasons/${id}`)
+  revalidatePath('/seasons')
+  return { success: true }
+}
