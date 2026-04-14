@@ -16,6 +16,16 @@ const installmentSchema = z.object({
   due_date: z.string().min(1, 'Due date is required'),
 })
 
+export const activitySchema = z.object({
+  type: z.enum(['spray', 'water', 'fertilize', 'harvest']),
+  farm_id: z.string().uuid('Select a farm'),
+  activity_date: z.string().min(1, 'Date is required'),
+  item_name: z.string().optional().or(z.literal('')),
+  meter_reading: z.coerce.number().optional(),
+  boxes_collected: z.coerce.number().int().min(0).optional(),
+  description: z.string().optional().or(z.literal('')),
+})
+
 export const seasonCreateSchema = z.object({
   year: z.coerce.number().int().min(2020).max(2100),
   contractor_name: z.string().min(1, 'Contractor name is required'),
