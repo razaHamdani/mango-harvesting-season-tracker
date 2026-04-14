@@ -14,10 +14,7 @@ import {
 } from '@/components/ui/table'
 import { ImageIcon } from 'lucide-react'
 import { PaymentForm } from '@/components/payment/payment-form'
-
-function formatPKR(amount: number): string {
-  return `Rs. ${amount.toLocaleString('en-PK')}`
-}
+import { formatPKR } from '@/lib/utils/format'
 
 function getStatus(installment: Installment): 'paid' | 'overdue' | 'pending' {
   if (installment.paid_amount !== null) return 'paid'

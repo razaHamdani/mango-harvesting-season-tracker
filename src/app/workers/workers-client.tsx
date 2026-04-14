@@ -23,10 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-
-function formatPKR(amount: number): string {
-  return `Rs. ${amount.toLocaleString('en-PK')}`
-}
+import { formatPKR } from '@/lib/utils/format'
 
 interface WorkersClientProps {
   workers: Worker[]

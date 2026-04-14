@@ -5,10 +5,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import type { SeasonInsightsView } from '@/lib/queries/insights-queries'
-
-function formatPKR(amount: number): string {
-  return `Rs. ${Math.round(amount).toLocaleString('en-PK')}`
-}
+import { formatPKR } from '@/lib/utils/format'
 
 export function SummaryCards({ view }: { view: SeasonInsightsView }) {
   const netIsProfit = view.netProfit >= 0

@@ -4,6 +4,7 @@ import { useTransition } from 'react'
 import { CameraIcon, Trash2Icon } from 'lucide-react'
 import type { ActivityWithFarm } from '@/lib/queries/activity-queries'
 import { deleteActivity } from '@/lib/actions/activity-actions'
+import { formatDate } from '@/lib/utils/format'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -20,15 +21,6 @@ const TYPE_STYLES: Record<string, string> = {
   water: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
   fertilize: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
   harvest: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
-}
-
-function formatDate(dateStr: string): string {
-  const date = new Date(dateStr + 'T00:00:00')
-  return date.toLocaleDateString('en-PK', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  })
 }
 
 function getDetails(activity: ActivityWithFarm): string {

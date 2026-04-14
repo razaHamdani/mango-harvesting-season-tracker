@@ -9,18 +9,7 @@ import {
 import { Separator } from '@/components/ui/separator'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-
-function formatPKR(amount: number): string {
-  return `Rs. ${amount.toLocaleString('en-PK')}`
-}
-
-function formatDate(date: string): string {
-  return new Date(date).toLocaleDateString('en-PK', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  })
-}
+import { formatPKR, formatDate } from '@/lib/utils/format'
 
 export default async function DashboardPage() {
   const data = await getDashboardData()

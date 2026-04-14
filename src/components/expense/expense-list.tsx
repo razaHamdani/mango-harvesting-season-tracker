@@ -4,6 +4,7 @@ import { useTransition } from 'react'
 import { CameraIcon, Trash2Icon } from 'lucide-react'
 import type { ExpenseWithFarm } from '@/lib/queries/expense-queries'
 import { deleteExpense } from '@/lib/actions/expense-actions'
+import { formatPKR, formatDate } from '@/lib/utils/format'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -28,18 +29,7 @@ const CATEGORY_STYLES: Record<string, string> = {
   misc: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400',
 }
 
-function formatDate(dateStr: string): string {
-  const date = new Date(dateStr + 'T00:00:00')
-  return date.toLocaleDateString('en-PK', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  })
-}
-
-function formatCurrency(amount: number): string {
-  return `Rs. ${amount.toLocaleString('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
-}
+const formatCurrency = formatPKR
 
 interface ExpenseListProps {
   expenses: ExpenseWithFarm[]

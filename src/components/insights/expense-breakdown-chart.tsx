@@ -15,12 +15,9 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import { formatPKR } from '@/lib/utils/format'
 
 const CATEGORIES = ['electricity', 'spray', 'fertilizer', 'labor', 'misc']
-
-function formatPKR(amount: number): string {
-  return `Rs. ${Math.round(amount).toLocaleString('en-PK')}`
-}
 
 export function ExpenseBreakdownChart({
   expensesByCategory,

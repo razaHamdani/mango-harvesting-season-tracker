@@ -9,10 +9,7 @@ import {
   CardAction,
   CardFooter,
 } from '@/components/ui/card'
-
-function formatPKR(amount: number): string {
-  return `Rs. ${amount.toLocaleString('en-PK')}`
-}
+import { formatPKR } from '@/lib/utils/format'
 
 export function SeasonCard({ season }: { season: SeasonWithStats }) {
   return (

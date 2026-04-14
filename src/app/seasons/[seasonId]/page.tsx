@@ -9,10 +9,7 @@ import {
 import { Separator } from '@/components/ui/separator'
 import { DutySplitDisplay } from '@/components/season/duty-split-display'
 import { SeasonActionButtons } from '@/components/season/season-action-buttons'
-
-function formatPKR(amount: number): string {
-  return `Rs. ${amount.toLocaleString('en-PK')}`
-}
+import { formatPKR } from '@/lib/utils/format'
 
 export default async function SeasonOverviewPage({
   params,

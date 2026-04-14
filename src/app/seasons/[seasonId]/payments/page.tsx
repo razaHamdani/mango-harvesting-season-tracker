@@ -1,10 +1,7 @@
 import { getSeasonById } from '@/lib/queries/season-queries'
 import { getInstallments } from '@/lib/queries/payment-queries'
 import { InstallmentSchedule } from '@/components/payment/installment-schedule'
-
-function formatPKR(amount: number): string {
-  return `Rs. ${amount.toLocaleString('en-PK')}`
-}
+import { formatPKR } from '@/lib/utils/format'
 
 export default async function PaymentsPage({
   params,

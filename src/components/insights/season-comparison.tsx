@@ -16,12 +16,9 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import type { SeasonInsightsView } from '@/lib/queries/insights-queries'
+import { formatPKR } from '@/lib/utils/format'
 
 type PastSeason = { id: string; year: number }
-
-function formatPKR(amount: number): string {
-  return `Rs. ${Math.round(amount).toLocaleString('en-PK')}`
-}
 
 type MetricRow = {
   label: string

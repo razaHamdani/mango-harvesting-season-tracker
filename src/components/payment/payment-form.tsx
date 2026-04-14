@@ -16,10 +16,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { PhotoUpload } from '@/components/photo/photo-upload'
-
-function formatPKR(amount: number): string {
-  return `Rs. ${amount.toLocaleString('en-PK')}`
-}
+import { formatPKR } from '@/lib/utils/format'
 
 interface PaymentFormProps {
   installment: Installment
