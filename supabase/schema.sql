@@ -239,3 +239,57 @@ BEGIN
     RETURN result;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ============================================================
+-- RPC: Atomic Season Creation
+-- Creates season + season_farms + installments in one transaction.
+-- Returns the new season's UUID. Any failure (e.g. unique-index
+-- violation on active season, farm insert error) rolls back the
+-- whole thing -- no orphan rows.
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION create_season_with_children(
+    p_owner_id UUID,
+    p_year INTEGER,
+    p_contractor_name TEXT,
+    p_contractor_phone TEXT,
+    p_contractor_cnic TEXT,
+    p_predetermined_amount DECIMAL,
+    p_spray_landlord_pct INTEGER,
+    p_fertilizer_landlord_pct INTEGER,
+    p_agreed_boxes INTEGER,
+    p_farm_ids UUID[],
+    p_installments JSONB
+) RETURNS UUID AS $$
+DECLARE
+    v_season_id UUID;
+BEGIN
+    -- Caller must match p_owner_id (defense in depth; RLS would also block)
+    IF auth.uid() IS NULL OR auth.uid() <> p_owner_id THEN
+        RAISE EXCEPTION 'Not authorized';
+    END IF;
+
+    INSERT INTO seasons (
+        owner_id, year, status, contractor_name, contractor_phone,
+        contractor_cnic, predetermined_amount, spray_landlord_pct,
+        fertilizer_landlord_pct, agreed_boxes
+    ) VALUES (
+        p_owner_id, p_year, 'draft', p_contractor_name, p_contractor_phone,
+        p_contractor_cnic, p_predetermined_amount, p_spray_landlord_pct,
+        p_fertilizer_landlord_pct, p_agreed_boxes
+    ) RETURNING id INTO v_season_id;
+
+    INSERT INTO season_farms (season_id, farm_id)
+    SELECT v_season_id, unnest(p_farm_ids);
+
+    INSERT INTO installments (season_id, installment_number, expected_amount, due_date)
+    SELECT
+        v_season_id,
+        (ord)::int,
+        (elem->>'amount')::decimal,
+        (elem->>'due_date')::date
+    FROM jsonb_array_elements(p_installments) WITH ORDINALITY AS t(elem, ord);
+
+    RETURN v_season_id;
+END;
+$$ LANGUAGE plpgsql SECURITY INVOKER;

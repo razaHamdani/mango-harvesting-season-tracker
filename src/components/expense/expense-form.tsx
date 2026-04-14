@@ -22,6 +22,7 @@ interface ExpenseFormProps {
   seasonId: string
   farms: Farm[]
   season: Pick<Season, 'id' | 'year' | 'spray_landlord_pct' | 'fertilizer_landlord_pct'>
+  userId: string
 }
 
 const EXPENSE_CATEGORIES: { value: ExpenseCategory; label: string }[] = [
@@ -34,7 +35,7 @@ const EXPENSE_CATEGORIES: { value: ExpenseCategory; label: string }[] = [
 
 type FieldErrors = Record<string, string[] | undefined>
 
-export function ExpenseForm({ seasonId, farms, season }: ExpenseFormProps) {
+export function ExpenseForm({ seasonId, farms, season, userId }: ExpenseFormProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [errors, setErrors] = useState<FieldErrors>({})
@@ -46,7 +47,7 @@ export function ExpenseForm({ seasonId, farms, season }: ExpenseFormProps) {
   )
   const [farmId, setFarmId] = useState('')
   const [description, setDescription] = useState('')
-  const [photo, setPhoto] = useState<File | null>(null)
+  const [photoPath, setPhotoPath] = useState<string | null>(null)
 
   const parsedAmount = parseFloat(amount) || 0
 
@@ -83,8 +84,8 @@ export function ExpenseForm({ seasonId, farms, season }: ExpenseFormProps) {
       formData.set('farm_id', farmId)
       formData.set('description', description)
 
-      if (photo) {
-        formData.set('photo', photo)
+      if (photoPath) {
+        formData.set('photo_path', photoPath)
       }
 
       const result = await createExpense(formData, seasonId)
@@ -224,7 +225,11 @@ export function ExpenseForm({ seasonId, farms, season }: ExpenseFormProps) {
       {/* Photo */}
       <div className="flex flex-col gap-1.5">
         <Label>Receipt photo (optional)</Label>
-        <PhotoUpload name="photo" onChange={setPhoto} />
+        <PhotoUpload
+          name="photo"
+          pathPrefix={`${userId}/${seasonId}/expenses`}
+          onChange={setPhotoPath}
+        />
       </div>
 
       {/* Form-level errors */}

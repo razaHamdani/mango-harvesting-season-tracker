@@ -4,7 +4,6 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { expenseSchema } from '@/lib/utils/validators'
 import { calculateLandlordCost } from '@/lib/utils/duty-split'
-import { uploadPhotoToStorage } from '@/lib/utils/photo'
 
 export async function createExpense(formData: FormData, seasonId: string) {
   const parsed = expenseSchema.safeParse({
@@ -48,6 +47,14 @@ export async function createExpense(formData: FormData, seasonId: string) {
     season
   )
 
+  // Photo (if any) was already uploaded client-side; persist the path only
+  // if it is within the caller's namespace.
+  const rawPhotoPath = formData.get('photo_path') as string | null
+  const photoPath =
+    rawPhotoPath && rawPhotoPath.startsWith(`${user.id}/${seasonId}/expenses/`)
+      ? rawPhotoPath
+      : null
+
   const { data: expense, error: insertError } = await supabase
     .from('expenses')
     .insert({
@@ -59,26 +66,13 @@ export async function createExpense(formData: FormData, seasonId: string) {
       expense_date: parsed.data.expense_date,
       description: parsed.data.description || null,
       linked_activity_id: parsed.data.linked_activity_id || null,
+      photo_path: photoPath,
     })
     .select('id')
     .single()
 
   if (insertError || !expense) {
     return { error: insertError?.message ?? 'Failed to create expense.' }
-  }
-
-  // Handle photo upload
-  const photo = formData.get('photo') as File | null
-  if (photo && photo.size > 0) {
-    const path = `${user.id}/${seasonId}/expenses/${expense.id}.jpg`
-    const storedPath = await uploadPhotoToStorage(supabase, photo, path)
-
-    if (storedPath) {
-      await supabase
-        .from('expenses')
-        .update({ photo_path: storedPath })
-        .eq('id', expense.id)
-    }
   }
 
   revalidatePath(`/seasons/${seasonId}/expenses`)

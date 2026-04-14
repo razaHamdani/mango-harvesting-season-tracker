@@ -1,3 +1,5 @@
+import { redirect } from 'next/navigation'
+import { createClient } from '@/lib/supabase/server'
 import { getSeasonById } from '@/lib/queries/season-queries'
 import { getInstallments } from '@/lib/queries/payment-queries'
 import { InstallmentSchedule } from '@/components/payment/installment-schedule'
@@ -9,6 +11,12 @@ export default async function PaymentsPage({
   params: Promise<{ seasonId: string }>
 }) {
   const { seasonId } = await params
+
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
 
   const [season, installments] = await Promise.all([
     getSeasonById(seasonId),
@@ -65,6 +73,7 @@ export default async function PaymentsPage({
         <InstallmentSchedule
           installments={installments}
           seasonId={seasonId}
+          userId={user.id}
         />
       )}
     </div>

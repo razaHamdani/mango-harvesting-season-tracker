@@ -1,4 +1,5 @@
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
+import { createClient } from '@/lib/supabase/server'
 import { getSeasonById } from '@/lib/queries/season-queries'
 import { getSeasonFarms } from '@/lib/queries/activity-queries'
 import { ExpenseForm } from '@/components/expense/expense-form'
@@ -9,6 +10,13 @@ export default async function NewExpensePage({
   params: Promise<{ seasonId: string }>
 }) {
   const { seasonId } = await params
+
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
   const [season, farms] = await Promise.all([
     getSeasonById(seasonId),
     getSeasonFarms(seasonId),
@@ -27,7 +35,12 @@ export default async function NewExpensePage({
         </p>
       </div>
 
-      <ExpenseForm seasonId={seasonId} farms={farms} season={season} />
+      <ExpenseForm
+        seasonId={seasonId}
+        farms={farms}
+        season={season}
+        userId={user.id}
+      />
     </div>
   )
 }

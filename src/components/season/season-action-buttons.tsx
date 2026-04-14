@@ -2,8 +2,7 @@
 
 import { useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
-import { Button, buttonVariants } from '@/components/ui/button'
+import { Button } from '@/components/ui/button'
 import { activateSeason, closeSeason, deleteSeason } from '@/lib/actions/season-actions'
 import type { SeasonStatus } from '@/types/database'
 
@@ -63,9 +62,6 @@ export function SeasonActionButtons({
           <Button onClick={handleActivate} disabled={isPending}>
             Activate Season
           </Button>
-          <Link href={`/seasons/${seasonId}/edit`} className={buttonVariants({ variant: 'outline' })}>
-            Edit Season
-          </Link>
           <Button variant="destructive" onClick={handleDelete} disabled={isPending}>
             Delete Season
           </Button>

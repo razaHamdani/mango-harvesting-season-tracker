@@ -49,81 +49,45 @@ export async function createSeason(data: SeasonInput) {
     return { error: { _form: ['You must be logged in.'] } }
   }
 
-  // Check no other active season exists
-  const { data: activeSeason } = await supabase
-    .from('seasons')
-    .select('id')
-    .eq('owner_id', user.id)
-    .eq('status', 'active')
-    .limit(1)
-    .single()
-
-  if (activeSeason) {
-    return {
-      error: {
-        _form: ['An active season already exists. Close it before creating a new one.'],
-      },
+  // Atomic: single Postgres transaction via RPC. If anything fails
+  // (unique-index violation, RLS denial, FK error), nothing is inserted --
+  // no orphan seasons, no partial installment schedules.
+  // Cast: generated types lag the schema until `supabase gen types` is re-run
+  // after the RPC migration lands.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rpc = supabase.rpc as any
+  const { data: newSeasonId, error: rpcError } = await rpc(
+    'create_season_with_children',
+    {
+      p_owner_id: user.id,
+      p_year: parsed.data.year,
+      p_contractor_name: parsed.data.contractor_name,
+      p_contractor_phone: parsed.data.contractor_phone || null,
+      p_contractor_cnic: parsed.data.contractor_cnic || null,
+      p_predetermined_amount: parsed.data.predetermined_amount,
+      p_spray_landlord_pct: parsed.data.spray_landlord_pct,
+      p_fertilizer_landlord_pct: parsed.data.fertilizer_landlord_pct,
+      p_agreed_boxes: parsed.data.agreed_boxes,
+      p_farm_ids: parsed.data.farm_ids,
+      p_installments: parsed.data.installments,
     }
-  }
+  )
 
-  // Insert season
-  const { data: season, error: seasonError } = await supabase
-    .from('seasons')
-    .insert({
-      owner_id: user.id,
-      year: parsed.data.year,
-      status: 'draft',
-      contractor_name: parsed.data.contractor_name,
-      contractor_phone: parsed.data.contractor_phone || null,
-      contractor_cnic: parsed.data.contractor_cnic || null,
-      predetermined_amount: parsed.data.predetermined_amount,
-      spray_landlord_pct: parsed.data.spray_landlord_pct,
-      fertilizer_landlord_pct: parsed.data.fertilizer_landlord_pct,
-      agreed_boxes: parsed.data.agreed_boxes,
-    })
-    .select('id')
-    .single()
-
-  if (seasonError || !season) {
-    return { error: { _form: [seasonError?.message ?? 'Failed to create season.'] } }
-  }
-
-  // Insert season_farms
-  const seasonFarms = parsed.data.farm_ids.map((farm_id) => ({
-    season_id: season.id,
-    farm_id,
-  }))
-
-  const { error: farmsError } = await supabase
-    .from('season_farms')
-    .insert(seasonFarms)
-
-  if (farmsError) {
-    // Clean up the season if farm insertion fails
-    await supabase.from('seasons').delete().eq('id', season.id)
-    return { error: { _form: [farmsError.message] } }
-  }
-
-  // Insert installments
-  const installments = parsed.data.installments.map((inst, index) => ({
-    season_id: season.id,
-    installment_number: index + 1,
-    expected_amount: inst.amount,
-    due_date: inst.due_date,
-  }))
-
-  const { error: installmentsError } = await supabase
-    .from('installments')
-    .insert(installments)
-
-  if (installmentsError) {
-    // Clean up - CASCADE on season delete handles season_farms
-    await supabase.from('seasons').delete().eq('id', season.id)
-    return { error: { _form: [installmentsError.message] } }
+  if (rpcError || !newSeasonId) {
+    const msg = rpcError?.message ?? 'Failed to create season.'
+    // Surface the active-season constraint as a friendly message.
+    if (msg.includes('one_active_season_per_owner')) {
+      return {
+        error: {
+          _form: ['An active season already exists. Close it before creating a new one.'],
+        },
+      }
+    }
+    return { error: { _form: [msg] } }
   }
 
   revalidatePath('/seasons')
-  return { id: season.id }
+  return { id: newSeasonId as string }
 }
 
 export async function deleteSeason(id: string) {

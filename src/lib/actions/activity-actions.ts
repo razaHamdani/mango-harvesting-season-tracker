@@ -3,7 +3,6 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { activitySchema } from '@/lib/utils/validators'
-import { uploadPhotoToStorage } from '@/lib/utils/photo'
 
 export async function createActivity(formData: FormData) {
   const parsed = activitySchema.safeParse({
@@ -35,6 +34,14 @@ export async function createActivity(formData: FormData) {
     return { error: 'You must be logged in.' }
   }
 
+  // Photo (if any) was already uploaded client-side; we just persist the path.
+  // Validate the path is within the user's namespace to prevent spoofing.
+  const rawPhotoPath = formData.get('photo_path') as string | null
+  const photoPath =
+    rawPhotoPath && rawPhotoPath.startsWith(`${user.id}/${seasonId}/activities/`)
+      ? rawPhotoPath
+      : null
+
   const { data: activity, error: insertError } = await supabase
     .from('activities')
     .insert({
@@ -46,26 +53,13 @@ export async function createActivity(formData: FormData) {
       meter_reading: parsed.data.meter_reading ?? null,
       boxes_collected: parsed.data.boxes_collected ?? null,
       description: parsed.data.description || null,
+      photo_path: photoPath,
     })
     .select('id')
     .single()
 
   if (insertError || !activity) {
     return { error: insertError?.message ?? 'Failed to create activity.' }
-  }
-
-  // Handle photo upload
-  const photo = formData.get('photo') as File | null
-  if (photo && photo.size > 0) {
-    const path = `${user.id}/${seasonId}/activities/${activity.id}.jpg`
-    const storedPath = await uploadPhotoToStorage(supabase, photo, path)
-
-    if (storedPath) {
-      await supabase
-        .from('activities')
-        .update({ photo_path: storedPath })
-        .eq('id', activity.id)
-    }
   }
 
   revalidatePath(`/seasons/${seasonId}/activities`)

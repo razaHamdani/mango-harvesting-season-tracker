@@ -41,11 +41,13 @@ function StatusBadge({ status }: { status: 'paid' | 'overdue' | 'pending' }) {
 interface InstallmentScheduleProps {
   installments: Installment[]
   seasonId: string
+  userId: string
 }
 
 export function InstallmentSchedule({
   installments,
   seasonId,
+  userId,
 }: InstallmentScheduleProps) {
   const [selectedInstallment, setSelectedInstallment] =
     useState<Installment | null>(null)
@@ -108,6 +110,7 @@ export function InstallmentSchedule({
         <PaymentForm
           installment={selectedInstallment}
           seasonId={seasonId}
+          userId={userId}
           open={!!selectedInstallment}
           onOpenChange={(open) => {
             if (!open) setSelectedInstallment(null)

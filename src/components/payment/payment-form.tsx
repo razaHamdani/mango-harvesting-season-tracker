@@ -21,6 +21,7 @@ import { formatPKR } from '@/lib/utils/format'
 interface PaymentFormProps {
   installment: Installment
   seasonId: string
+  userId: string
   open: boolean
   onOpenChange: (open: boolean) => void
 }
@@ -28,6 +29,7 @@ interface PaymentFormProps {
 export function PaymentForm({
   installment,
   seasonId,
+  userId,
   open,
   onOpenChange,
 }: PaymentFormProps) {
@@ -39,7 +41,7 @@ export function PaymentForm({
     new Date().toISOString().split('T')[0]
   )
   const [notes, setNotes] = useState('')
-  const [photo, setPhoto] = useState<File | null>(null)
+  const [photoPath, setPhotoPath] = useState<string | null>(null)
 
   function handleSubmit() {
     setError(null)
@@ -50,8 +52,8 @@ export function PaymentForm({
       formData.set('paid_date', paidDate)
       formData.set('notes', notes)
 
-      if (photo) {
-        formData.set('photo', photo)
+      if (photoPath) {
+        formData.set('photo_path', photoPath)
       }
 
       const result = await recordPayment(installment.id, formData, seasonId)
@@ -120,7 +122,11 @@ export function PaymentForm({
 
           <div className="flex flex-col gap-1.5">
             <Label>Receipt Photo (optional)</Label>
-            <PhotoUpload name="receipt_photo" onChange={setPhoto} />
+            <PhotoUpload
+              name="receipt_photo"
+              pathPrefix={`${userId}/${seasonId}/payments`}
+              onChange={setPhotoPath}
+            />
           </div>
 
           {error && <p className="text-sm text-destructive">{error}</p>}

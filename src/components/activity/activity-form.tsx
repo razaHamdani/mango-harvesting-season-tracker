@@ -21,6 +21,7 @@ interface ActivityFormProps {
   seasonId: string
   farms: Farm[]
   season: Pick<Season, 'id' | 'year'>
+  userId: string
 }
 
 const ACTIVITY_TYPES: { value: ActivityType; label: string }[] = [
@@ -32,7 +33,7 @@ const ACTIVITY_TYPES: { value: ActivityType; label: string }[] = [
 
 type FieldErrors = Record<string, string[] | undefined>
 
-export function ActivityForm({ seasonId, farms }: ActivityFormProps) {
+export function ActivityForm({ seasonId, farms, userId }: ActivityFormProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [errors, setErrors] = useState<FieldErrors>({})
@@ -46,7 +47,7 @@ export function ActivityForm({ seasonId, farms }: ActivityFormProps) {
   const [meterReading, setMeterReading] = useState('')
   const [boxesCollected, setBoxesCollected] = useState('')
   const [description, setDescription] = useState('')
-  const [photo, setPhoto] = useState<File | null>(null)
+  const [photoPath, setPhotoPath] = useState<string | null>(null)
 
   function handleSubmit() {
     startTransition(async () => {
@@ -66,8 +67,8 @@ export function ActivityForm({ seasonId, farms }: ActivityFormProps) {
         formData.set('boxes_collected', boxesCollected)
       }
 
-      if (photo) {
-        formData.set('photo', photo)
+      if (photoPath) {
+        formData.set('photo_path', photoPath)
       }
 
       const result = await createActivity(formData)
@@ -199,7 +200,7 @@ export function ActivityForm({ seasonId, farms }: ActivityFormProps) {
       {/* Harvest: Boxes Collected */}
       {type === 'harvest' && (
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="boxes_collected">Boxes Collected</Label>
+          <Label htmlFor="boxes_collected">Boxes Received from Contractor</Label>
           <Input
             id="boxes_collected"
             type="number"
@@ -227,7 +228,11 @@ export function ActivityForm({ seasonId, farms }: ActivityFormProps) {
       {/* Photo */}
       <div className="flex flex-col gap-1.5">
         <Label>Photo (optional)</Label>
-        <PhotoUpload name="photo" onChange={setPhoto} />
+        <PhotoUpload
+          name="photo"
+          pathPrefix={`${userId}/${seasonId}/activities`}
+          onChange={setPhotoPath}
+        />
       </div>
 
       {/* Form-level errors */}

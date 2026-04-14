@@ -2,7 +2,6 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { uploadPhotoToStorage } from '@/lib/utils/photo'
 
 export async function recordPayment(
   installmentId: string,
@@ -17,22 +16,6 @@ export async function recordPayment(
 
   if (!user) {
     return { error: 'You must be logged in.' }
-  }
-
-  // Fetch the installment and validate it is not already paid
-  const { data: installment, error: fetchError } = await supabase
-    .from('installments')
-    .select('*')
-    .eq('id', installmentId)
-    .eq('season_id', seasonId)
-    .single()
-
-  if (fetchError || !installment) {
-    return { error: 'Installment not found.' }
-  }
-
-  if (installment.paid_amount !== null) {
-    return { error: 'This installment has already been recorded.' }
   }
 
   // Extract and validate form fields
@@ -50,32 +33,47 @@ export async function recordPayment(
 
   const notes = (formData.get('notes') as string) || null
 
-  // Update the installment
-  const { error: updateError } = await supabase
+  // Photo (if any) was already uploaded client-side; validate namespace.
+  const rawPhotoPath = formData.get('photo_path') as string | null
+  const receiptPhotoPath =
+    rawPhotoPath && rawPhotoPath.startsWith(`${user.id}/${seasonId}/payments/`)
+      ? rawPhotoPath
+      : null
+
+  // Atomic update: only succeeds if paid_amount IS NULL (prevents TOCTOU
+  // double-write from double-click / concurrent tabs). RLS still scopes by
+  // season ownership via the season_id FK policy.
+  const { data: updated, error: updateError } = await supabase
     .from('installments')
     .update({
       paid_amount: amount,
       paid_date: paidDate,
       notes,
+      receipt_photo_path: receiptPhotoPath,
     })
     .eq('id', installmentId)
+    .eq('season_id', seasonId)
+    .is('paid_amount', null)
+    .select('id')
 
   if (updateError) {
     return { error: updateError.message }
   }
 
-  // Handle receipt photo upload
-  const photo = formData.get('photo') as File | null
-  if (photo && photo.size > 0) {
-    const path = `${user.id}/${seasonId}/payments/${installmentId}.jpg`
-    const storedPath = await uploadPhotoToStorage(supabase, photo, path)
+  if (!updated || updated.length === 0) {
+    // Either the installment doesn't exist / not owned, or it was already paid.
+    // Disambiguate with a follow-up read so the UI can show the right message.
+    const { data: existing } = await supabase
+      .from('installments')
+      .select('paid_amount')
+      .eq('id', installmentId)
+      .eq('season_id', seasonId)
+      .maybeSingle()
 
-    if (storedPath) {
-      await supabase
-        .from('installments')
-        .update({ receipt_photo_path: storedPath })
-        .eq('id', installmentId)
+    if (!existing) {
+      return { error: 'Installment not found.' }
     }
+    return { error: 'This installment has already been recorded.' }
   }
 
   // Check if cumulative payments exceed predetermined_amount (warn only)
