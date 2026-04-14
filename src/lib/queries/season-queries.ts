@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import type { Season, Farm, Installment } from '@/types/database'
+import type { Season, Farm, Installment, Activity } from '@/types/database'
 
 export type SeasonWithStats = Season & {
   total_acreage: number
@@ -167,4 +167,156 @@ export async function getSeasonById(seasonId: string): Promise<SeasonDetail | nu
     total_acreage: totalAcreage,
     boxes_received: boxesReceived,
   }
+}
+
+export type SeasonInsights = {
+  predetermined_amount: number
+  total_acreage: number
+  agreed_boxes: number
+  boxes_received: number
+  total_expenses: number
+  expenses_by_category: Record<string, number>
+  total_payments_received: number
+  installments_paid: number
+  installments_total: number
+}
+
+export async function getSeasonInsights(
+  seasonId: string
+): Promise<SeasonInsights | null> {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return null
+  }
+
+  // Verify ownership before calling the RPC
+  const { data: season, error: seasonError } = await supabase
+    .from('seasons')
+    .select('id')
+    .eq('id', seasonId)
+    .eq('owner_id', user.id)
+    .single()
+
+  if (seasonError || !season) {
+    return null
+  }
+
+  const { data, error } = await supabase.rpc('get_season_insights', {
+    p_season_id: seasonId,
+  })
+
+  if (error || !data) {
+    return null
+  }
+
+  return data as unknown as SeasonInsights
+}
+
+export type DashboardData = {
+  activeSeason:
+    | (Season & {
+        insights: SeasonInsights
+        upcomingInstallments: Installment[]
+        recentActivities: (Activity & { farm_name: string })[]
+      })
+    | null
+  totalSeasons: number
+  totalFarms: number
+  totalWorkers: number
+}
+
+export async function getDashboardData(): Promise<DashboardData> {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  const empty: DashboardData = {
+    activeSeason: null,
+    totalSeasons: 0,
+    totalFarms: 0,
+    totalWorkers: 0,
+  }
+
+  if (!user) return empty
+
+  const [seasonsRes, farmsRes, workersRes] = await Promise.all([
+    supabase
+      .from('seasons')
+      .select('*')
+      .eq('owner_id', user.id)
+      .order('year', { ascending: false }),
+    supabase.from('farms').select('id', { count: 'exact', head: true }).eq('owner_id', user.id),
+    supabase.from('workers').select('id', { count: 'exact', head: true }).eq('owner_id', user.id),
+  ])
+
+  const seasons = seasonsRes.data ?? []
+  const active = seasons.find((s) => s.status === 'active') ?? null
+
+  const result: DashboardData = {
+    activeSeason: null,
+    totalSeasons: seasons.length,
+    totalFarms: farmsRes.count ?? 0,
+    totalWorkers: workersRes.count ?? 0,
+  }
+
+  if (!active) return result
+
+  const [insightsRes, unpaidInstRes, activitiesRes, seasonFarmsRes] = await Promise.all([
+    supabase.rpc('get_season_insights', { p_season_id: active.id }),
+    supabase
+      .from('installments')
+      .select('*')
+      .eq('season_id', active.id)
+      .is('paid_amount', null)
+      .order('due_date', { ascending: true })
+      .limit(5),
+    supabase
+      .from('activities')
+      .select('*')
+      .eq('season_id', active.id)
+      .order('activity_date', { ascending: false })
+      .limit(5),
+    supabase.from('season_farms').select('farm_id').eq('season_id', active.id),
+  ])
+
+  const farmIds = (seasonFarmsRes.data ?? []).map((sf) => sf.farm_id)
+  let farmNameMap = new Map<string, string>()
+  if (farmIds.length > 0) {
+    const { data: farmsData } = await supabase
+      .from('farms')
+      .select('id, name')
+      .in('id', farmIds)
+    farmNameMap = new Map((farmsData ?? []).map((f) => [f.id, f.name]))
+  }
+
+  const recentActivities = (activitiesRes.data ?? []).map((a) => ({
+    ...a,
+    farm_name: farmNameMap.get(a.farm_id) ?? '—',
+  }))
+
+  result.activeSeason = {
+    ...active,
+    insights: (insightsRes.data as unknown as SeasonInsights) ?? {
+      predetermined_amount: active.predetermined_amount,
+      total_acreage: 0,
+      agreed_boxes: active.agreed_boxes,
+      boxes_received: 0,
+      total_expenses: 0,
+      expenses_by_category: {},
+      total_payments_received: 0,
+      installments_paid: 0,
+      installments_total: 0,
+    },
+    upcomingInstallments: unpaidInstRes.data ?? [],
+    recentActivities,
+  }
+
+  return result
 }

@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation'
-import { getSeasonById } from '@/lib/queries/season-queries'
+import { getSeasonById, getSeasonInsights } from '@/lib/queries/season-queries'
 import {
   Card,
   CardContent,
@@ -20,11 +20,20 @@ export default async function SeasonOverviewPage({
   params: Promise<{ seasonId: string }>
 }) {
   const { seasonId } = await params
-  const season = await getSeasonById(seasonId)
+  const [season, insights] = await Promise.all([
+    getSeasonById(seasonId),
+    getSeasonInsights(seasonId),
+  ])
 
   if (!season) {
     notFound()
   }
+
+  const expenseCategories = insights
+    ? Object.entries(insights.expenses_by_category).sort(
+        ([, a], [, b]) => b - a
+      )
+    : []
 
   const totalPaid = season.installments.reduce(
     (sum, inst) => sum + (inst.paid_amount ?? 0),
@@ -129,6 +138,35 @@ export default async function SeasonOverviewPage({
           </CardContent>
         </Card>
       </div>
+
+      {/* Expenses Summary */}
+      {insights && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Expenses Summary (Landlord Share)</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="flex justify-between text-sm font-medium">
+              <span>Total Landlord Cost</span>
+              <span>{formatPKR(insights.total_expenses)}</span>
+            </div>
+            {expenseCategories.length > 0 && <Separator />}
+            {expenseCategories.map(([category, amount]) => (
+              <div key={category} className="flex justify-between text-sm">
+                <span className="text-muted-foreground capitalize">
+                  {category}
+                </span>
+                <span>{formatPKR(amount)}</span>
+              </div>
+            ))}
+            {expenseCategories.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                No expenses recorded yet.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Farm Summary */}
       <Card>
