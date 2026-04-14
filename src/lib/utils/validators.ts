@@ -26,6 +26,15 @@ export const activitySchema = z.object({
   description: z.string().optional().or(z.literal('')),
 })
 
+export const expenseSchema = z.object({
+  category: z.enum(['electricity', 'spray', 'fertilizer', 'labor', 'misc']),
+  amount: z.coerce.number().positive('Amount must be greater than 0'),
+  expense_date: z.string().min(1, 'Date is required'),
+  farm_id: z.string().optional().or(z.literal('')),
+  description: z.string().optional().or(z.literal('')),
+  linked_activity_id: z.string().optional().or(z.literal('')),
+})
+
 export const seasonCreateSchema = z.object({
   year: z.coerce.number().int().min(2020).max(2100),
   contractor_name: z.string().min(1, 'Contractor name is required'),
