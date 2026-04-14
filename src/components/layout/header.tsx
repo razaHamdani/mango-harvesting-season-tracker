@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import { MobileNav } from "@/components/layout/mobile-nav";
 
 const pageTitles: Record<string, string> = {
   "/dashboard": "Dashboard",
@@ -24,7 +25,8 @@ export function Header() {
   const title = getPageTitle(pathname);
 
   return (
-    <header className="flex h-14 shrink-0 items-center border-b px-6">
+    <header className="flex h-14 shrink-0 items-center gap-3 border-b px-4 md:px-6">
+      <MobileNav />
       <h1 className="text-lg font-semibold">{title}</h1>
     </header>
   );

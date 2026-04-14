@@ -111,7 +111,7 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="flex h-full w-60 flex-col border-r bg-zinc-950 text-zinc-100">
+    <aside className="hidden h-full w-60 flex-col border-r bg-zinc-950 text-zinc-100 md:flex">
       <div className="flex h-14 items-center px-5">
         <span className="text-lg font-bold tracking-tight">AamDaata</span>
       </div>
