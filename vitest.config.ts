@@ -21,7 +21,6 @@ export default defineConfig({
     // Concurrency inside a single test (e.g. Promise.all) is still allowed
     // and is exactly what the TOCTOU test depends on.
     pool: 'forks',
-    singleFork: true,
     fileParallelism: false,
   },
   resolve: {

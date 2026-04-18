@@ -71,7 +71,7 @@ export async function getExpenses(
     throw new Error(error.message)
   }
 
-  const rows = (data ?? []) as (Expense & { farms: { name: string } | null })[]
+  const rows = (data ?? []) as unknown as (Expense & { farms: { name: string } | null })[]
   const hasMore = rows.length > PAGE_SIZE
   const pageRows = rows.slice(0, PAGE_SIZE)
 

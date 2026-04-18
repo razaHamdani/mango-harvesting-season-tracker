@@ -63,10 +63,6 @@ export function PaymentForm({
         return
       }
 
-      if (result.warning) {
-        toast.warning(result.warning)
-      }
-
       toast.success('Payment recorded')
       onOpenChange(false)
     })

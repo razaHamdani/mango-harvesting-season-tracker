@@ -66,7 +66,7 @@ export async function getActivities(
     throw new Error(error.message)
   }
 
-  const rows = (data ?? []) as (Activity & { farms: { name: string } | null })[]
+  const rows = (data ?? []) as unknown as (Activity & { farms: { name: string } | null })[]
   const hasMore = rows.length > PAGE_SIZE
   const pageRows = rows.slice(0, PAGE_SIZE)
 
