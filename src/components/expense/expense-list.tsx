@@ -1,9 +1,10 @@
 'use client'
 
-import { useTransition } from 'react'
+import { useState, useTransition } from 'react'
 import { CameraIcon, Trash2Icon } from 'lucide-react'
-import type { ExpenseWithFarm } from '@/lib/queries/expense-queries'
+import type { ExpenseWithFarm, ExpenseFilters } from '@/lib/queries/expense-queries'
 import { deleteExpense } from '@/lib/actions/expense-actions'
+import { loadMoreExpenses } from '@/lib/actions/list-actions'
 import { formatPKR, formatDate } from '@/lib/utils/format'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -29,21 +30,26 @@ const CATEGORY_STYLES: Record<string, string> = {
   misc: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400',
 }
 
-const formatCurrency = formatPKR
-
 interface ExpenseListProps {
-  expenses: ExpenseWithFarm[]
+  initialItems: ExpenseWithFarm[]
+  initialNextCursor: number | null
   seasonId: string
+  filters: ExpenseFilters
+  totalAmount: number
+  totalLandlordCost: number
 }
 
-export function ExpenseList({ expenses, seasonId }: ExpenseListProps) {
+export function ExpenseList({
+  initialItems,
+  initialNextCursor,
+  seasonId,
+  filters,
+  totalAmount,
+  totalLandlordCost,
+}: ExpenseListProps) {
+  const [items, setItems] = useState(initialItems)
+  const [cursor, setCursor] = useState(initialNextCursor)
   const [isPending, startTransition] = useTransition()
-
-  const totalLandlordCost = expenses.reduce(
-    (sum, e) => sum + e.landlord_cost,
-    0
-  )
-  const totalAmount = expenses.reduce((sum, e) => sum + e.amount, 0)
 
   function handleDelete(expenseId: string) {
     if (!confirm('Delete this expense?')) return
@@ -51,77 +57,98 @@ export function ExpenseList({ expenses, seasonId }: ExpenseListProps) {
       const result = await deleteExpense(expenseId, seasonId)
       if (result.error) {
         alert(result.error)
+      } else {
+        setItems((prev) => prev.filter((e) => e.id !== expenseId))
       }
     })
   }
 
+  function handleLoadMore() {
+    if (cursor === null) return
+    startTransition(async () => {
+      const { items: more, nextCursor } = await loadMoreExpenses(seasonId, filters, cursor)
+      setItems((prev) => [...prev, ...more])
+      setCursor(nextCursor)
+    })
+  }
+
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Date</TableHead>
-          <TableHead>Category</TableHead>
-          <TableHead>Description</TableHead>
-          <TableHead className="text-right">Amount</TableHead>
-          <TableHead className="text-right">Landlord Cost</TableHead>
-          <TableHead>Farm</TableHead>
-          <TableHead className="w-10">Receipt</TableHead>
-          <TableHead className="w-10">Actions</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {expenses.map((expense) => (
-          <TableRow key={expense.id}>
-            <TableCell>{formatDate(expense.expense_date)}</TableCell>
-            <TableCell>
-              <Badge
-                className={CATEGORY_STYLES[expense.category] ?? ''}
-                variant="secondary"
-              >
-                {expense.category}
-              </Badge>
-            </TableCell>
-            <TableCell>{expense.description ?? '-'}</TableCell>
-            <TableCell className="text-right">
-              {formatCurrency(expense.amount)}
-            </TableCell>
-            <TableCell className="text-right">
-              {formatCurrency(expense.landlord_cost)}
-            </TableCell>
-            <TableCell>{expense.farm_name ?? '-'}</TableCell>
-            <TableCell>
-              {expense.photo_path && (
-                <CameraIcon className="h-4 w-4 text-muted-foreground" />
-              )}
-            </TableCell>
-            <TableCell>
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={isPending}
-                onClick={() => handleDelete(expense.id)}
-                className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-              >
-                <Trash2Icon className="h-4 w-4" />
-              </Button>
-            </TableCell>
+    <>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Date</TableHead>
+            <TableHead>Category</TableHead>
+            <TableHead>Description</TableHead>
+            <TableHead className="text-right">Amount</TableHead>
+            <TableHead className="text-right">Landlord Cost</TableHead>
+            <TableHead>Farm</TableHead>
+            <TableHead className="w-10">Receipt</TableHead>
+            <TableHead className="w-10">Actions</TableHead>
           </TableRow>
-        ))}
-      </TableBody>
-      <TableFooter>
-        <TableRow>
-          <TableCell colSpan={3} className="font-medium">
-            Total
-          </TableCell>
-          <TableCell className="text-right font-medium">
-            {formatCurrency(totalAmount)}
-          </TableCell>
-          <TableCell className="text-right font-medium">
-            {formatCurrency(totalLandlordCost)}
-          </TableCell>
-          <TableCell colSpan={3} />
-        </TableRow>
-      </TableFooter>
-    </Table>
+        </TableHeader>
+        <TableBody>
+          {items.map((expense) => (
+            <TableRow key={expense.id}>
+              <TableCell>{formatDate(expense.expense_date)}</TableCell>
+              <TableCell>
+                <Badge
+                  className={CATEGORY_STYLES[expense.category] ?? ''}
+                  variant="secondary"
+                >
+                  {expense.category}
+                </Badge>
+              </TableCell>
+              <TableCell>{expense.description ?? '-'}</TableCell>
+              <TableCell className="text-right">
+                {formatPKR(expense.amount)}
+              </TableCell>
+              <TableCell className="text-right">
+                {formatPKR(expense.landlord_cost)}
+              </TableCell>
+              <TableCell>{expense.farm_name ?? '-'}</TableCell>
+              <TableCell>
+                {expense.photo_path && (
+                  <CameraIcon className="h-4 w-4 text-muted-foreground" />
+                )}
+              </TableCell>
+              <TableCell>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={isPending}
+                  onClick={() => handleDelete(expense.id)}
+                  className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                >
+                  <Trash2Icon className="h-4 w-4" />
+                </Button>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+        <TableFooter>
+          <TableRow>
+            <TableCell colSpan={3} className="font-medium">
+              Total
+            </TableCell>
+            <TableCell className="text-right font-medium">
+              {formatPKR(totalAmount)}
+            </TableCell>
+            <TableCell className="text-right font-medium">
+              {formatPKR(totalLandlordCost)}
+            </TableCell>
+            <TableCell colSpan={3} />
+          </TableRow>
+        </TableFooter>
+      </Table>
+
+      {cursor !== null && (
+        <div className="mt-4 flex justify-center">
+          <Button variant="outline" size="sm" disabled={isPending} onClick={handleLoadMore}>
+            {isPending ? 'Loading…' : 'Load more'}
+          </Button>
+        </div>
+      )}
+    </>
   )
 }

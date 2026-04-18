@@ -1,9 +1,10 @@
 'use client'
 
-import { useTransition } from 'react'
+import { useState, useTransition } from 'react'
 import { CameraIcon, Trash2Icon } from 'lucide-react'
-import type { ActivityWithFarm } from '@/lib/queries/activity-queries'
+import type { ActivityWithFarm, ActivityFilters } from '@/lib/queries/activity-queries'
 import { deleteActivity } from '@/lib/actions/activity-actions'
+import { loadMoreActivities } from '@/lib/actions/list-actions'
 import { formatDate } from '@/lib/utils/format'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -42,11 +43,20 @@ function getDetails(activity: ActivityWithFarm): string {
 }
 
 interface ActivityListProps {
-  activities: ActivityWithFarm[]
+  initialItems: ActivityWithFarm[]
+  initialNextCursor: number | null
   seasonId: string
+  filters: ActivityFilters
 }
 
-export function ActivityList({ activities, seasonId }: ActivityListProps) {
+export function ActivityList({
+  initialItems,
+  initialNextCursor,
+  seasonId,
+  filters,
+}: ActivityListProps) {
+  const [items, setItems] = useState(initialItems)
+  const [cursor, setCursor] = useState(initialNextCursor)
   const [isPending, startTransition] = useTransition()
 
   function handleDelete(activityId: string) {
@@ -55,55 +65,76 @@ export function ActivityList({ activities, seasonId }: ActivityListProps) {
       const result = await deleteActivity(activityId, seasonId)
       if (result.error) {
         alert(result.error)
+      } else {
+        setItems((prev) => prev.filter((a) => a.id !== activityId))
       }
     })
   }
 
+  function handleLoadMore() {
+    if (cursor === null) return
+    startTransition(async () => {
+      const { items: more, nextCursor } = await loadMoreActivities(seasonId, filters, cursor)
+      setItems((prev) => [...prev, ...more])
+      setCursor(nextCursor)
+    })
+  }
+
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Date</TableHead>
-          <TableHead>Type</TableHead>
-          <TableHead>Farm</TableHead>
-          <TableHead>Details</TableHead>
-          <TableHead className="w-10">Photo</TableHead>
-          <TableHead className="w-10">Actions</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {activities.map((activity) => (
-          <TableRow key={activity.id}>
-            <TableCell>{formatDate(activity.activity_date)}</TableCell>
-            <TableCell>
-              <Badge
-                className={TYPE_STYLES[activity.type] ?? ''}
-                variant="secondary"
-              >
-                {activity.type}
-              </Badge>
-            </TableCell>
-            <TableCell>{activity.farm_name}</TableCell>
-            <TableCell>{getDetails(activity)}</TableCell>
-            <TableCell>
-              {activity.photo_path && (
-                <CameraIcon className="h-4 w-4 text-muted-foreground" />
-              )}
-            </TableCell>
-            <TableCell>
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={isPending}
-                onClick={() => handleDelete(activity.id)}
-                className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-              >
-                <Trash2Icon className="h-4 w-4" />
-              </Button>
-            </TableCell>
+    <>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Date</TableHead>
+            <TableHead>Type</TableHead>
+            <TableHead>Farm</TableHead>
+            <TableHead>Details</TableHead>
+            <TableHead className="w-10">Photo</TableHead>
+            <TableHead className="w-10">Actions</TableHead>
           </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+        </TableHeader>
+        <TableBody>
+          {items.map((activity) => (
+            <TableRow key={activity.id}>
+              <TableCell>{formatDate(activity.activity_date)}</TableCell>
+              <TableCell>
+                <Badge
+                  className={TYPE_STYLES[activity.type] ?? ''}
+                  variant="secondary"
+                >
+                  {activity.type}
+                </Badge>
+              </TableCell>
+              <TableCell>{activity.farm_name}</TableCell>
+              <TableCell>{getDetails(activity)}</TableCell>
+              <TableCell>
+                {activity.photo_path && (
+                  <CameraIcon className="h-4 w-4 text-muted-foreground" />
+                )}
+              </TableCell>
+              <TableCell>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={isPending}
+                  onClick={() => handleDelete(activity.id)}
+                  className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                >
+                  <Trash2Icon className="h-4 w-4" />
+                </Button>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+
+      {cursor !== null && (
+        <div className="mt-4 flex justify-center">
+          <Button variant="outline" size="sm" disabled={isPending} onClick={handleLoadMore}>
+            {isPending ? 'Loading…' : 'Load more'}
+          </Button>
+        </div>
+      )}
+    </>
   )
 }

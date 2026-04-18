@@ -22,7 +22,7 @@ export default async function ActivitiesPage({
     dateTo: typeof sp.dateTo === 'string' ? sp.dateTo : undefined,
   }
 
-  const [activities, farms] = await Promise.all([
+  const [{ items: activities, nextCursor }, farms] = await Promise.all([
     getActivities(seasonId, filters),
     getSeasonFarms(seasonId),
   ])
@@ -50,7 +50,12 @@ export default async function ActivitiesPage({
           </Button>
         </div>
       ) : (
-        <ActivityList activities={activities} seasonId={seasonId} />
+        <ActivityList
+          initialItems={activities}
+          initialNextCursor={nextCursor}
+          seasonId={seasonId}
+          filters={filters}
+        />
       )}
     </div>
   )

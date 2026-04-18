@@ -36,6 +36,7 @@ export default async function PaymentsPage({
     0
   )
   const predeterminedAmount = season.predetermined_amount
+  const isOverpaid = totalReceived > predeterminedAmount
   const paymentPercentage =
     predeterminedAmount > 0
       ? Math.round((totalReceived / predeterminedAmount) * 100)
@@ -61,6 +62,12 @@ export default async function PaymentsPage({
           />
         </div>
       </div>
+
+      {isOverpaid && (
+        <div className="rounded-lg border border-yellow-300 bg-yellow-50 px-4 py-3 text-sm text-yellow-800 dark:border-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-400">
+          Total payments ({formatPKR(totalReceived)}) exceed the predetermined amount ({formatPKR(predeterminedAmount)}).
+        </div>
+      )}
 
       {/* Installment Schedule */}
       {installments.length === 0 ? (

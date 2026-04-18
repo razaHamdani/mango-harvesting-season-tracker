@@ -76,29 +76,6 @@ export async function recordPayment(
     return { error: 'This installment has already been recorded.' }
   }
 
-  // Check if cumulative payments exceed predetermined_amount (warn only)
-  const { data: season } = await supabase
-    .from('seasons')
-    .select('predetermined_amount')
-    .eq('id', seasonId)
-    .single()
-
-  const { data: allInstallments } = await supabase
-    .from('installments')
-    .select('paid_amount')
-    .eq('season_id', seasonId)
-
-  let warning: string | undefined
-  if (season && allInstallments) {
-    const totalPaid = allInstallments.reduce(
-      (sum, inst) => sum + (inst.paid_amount ?? 0),
-      0
-    )
-    if (totalPaid > season.predetermined_amount) {
-      warning = `Total payments (Rs. ${totalPaid.toLocaleString('en-PK')}) exceed the predetermined amount (Rs. ${season.predetermined_amount.toLocaleString('en-PK')}).`
-    }
-  }
-
   revalidatePath(`/seasons/${seasonId}/payments`)
-  return { success: true, warning }
+  return { success: true }
 }

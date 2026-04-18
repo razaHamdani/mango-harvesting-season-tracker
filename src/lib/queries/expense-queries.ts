@@ -5,15 +5,30 @@ export type ExpenseWithFarm = Expense & {
   farm_name: string | null
 }
 
+export type ExpenseFilters = {
+  category?: string
+  farmId?: string
+  dateFrom?: string
+  dateTo?: string
+}
+
+export type ExpensesPage = {
+  items: ExpenseWithFarm[]
+  nextCursor: number | null
+}
+
+export type ExpenseTotals = {
+  totalAmount: number
+  totalLandlordCost: number
+}
+
+const PAGE_SIZE = 50
+
 export async function getExpenses(
   seasonId: string,
-  filters?: {
-    category?: string
-    farmId?: string
-    dateFrom?: string
-    dateTo?: string
-  }
-): Promise<ExpenseWithFarm[]> {
+  filters?: ExpenseFilters,
+  offset = 0,
+): Promise<ExpensesPage> {
   const supabase = await createClient()
 
   const {
@@ -21,12 +36,13 @@ export async function getExpenses(
   } = await supabase.auth.getUser()
 
   if (!user) {
-    return []
+    return { items: [], nextCursor: null }
   }
 
+  // Embed farms(name) to resolve farm_name in one round-trip.
   let query = supabase
     .from('expenses')
-    .select('*')
+    .select('*, farms(name)')
     .eq('season_id', seasonId)
 
   if (filters?.category) {
@@ -45,44 +61,71 @@ export async function getExpenses(
     query = query.lte('expense_date', filters.dateTo)
   }
 
-  query = query
+  // Request one extra row to detect whether a next page exists.
+  const { data, error } = await query
     .order('expense_date', { ascending: false })
     .order('created_at', { ascending: false })
-
-  const { data: expenses, error } = await query
+    .range(offset, offset + PAGE_SIZE)
 
   if (error) {
     throw new Error(error.message)
   }
 
-  if (!expenses || expenses.length === 0) {
-    return []
+  const rows = (data ?? []) as (Expense & { farms: { name: string } | null })[]
+  const hasMore = rows.length > PAGE_SIZE
+  const pageRows = rows.slice(0, PAGE_SIZE)
+
+  return {
+    items: pageRows.map(({ farms, ...rest }) => ({
+      ...rest,
+      farm_name: rest.farm_id ? (farms?.name ?? null) : null,
+    })),
+    nextCursor: hasMore ? offset + PAGE_SIZE : null,
+  }
+}
+
+// Separate aggregate query so the footer always reflects the true total
+// for all matching expenses, regardless of how many pages are loaded.
+export async function getExpenseTotals(
+  seasonId: string,
+  filters?: ExpenseFilters,
+): Promise<ExpenseTotals> {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { totalAmount: 0, totalLandlordCost: 0 }
   }
 
-  // Fetch farm names for expenses that have a farm_id
-  const farmIds = [
-    ...new Set(expenses.map((e) => e.farm_id).filter(Boolean)),
-  ] as string[]
+  let query = supabase
+    .from('expenses')
+    .select('amount, landlord_cost')
+    .eq('season_id', seasonId)
 
-  let farmNameMap = new Map<string, string>()
-
-  if (farmIds.length > 0) {
-    const { data: farms, error: farmsError } = await supabase
-      .from('farms')
-      .select('id, name')
-      .in('id', farmIds)
-
-    if (farmsError) {
-      throw new Error(farmsError.message)
-    }
-
-    farmNameMap = new Map((farms ?? []).map((f) => [f.id, f.name]))
+  if (filters?.category) {
+    query = query.eq('category', filters.category as Expense['category'])
   }
 
-  return expenses.map((expense) => ({
-    ...expense,
-    farm_name: expense.farm_id
-      ? farmNameMap.get(expense.farm_id) ?? null
-      : null,
-  }))
+  if (filters?.farmId) {
+    query = query.eq('farm_id', filters.farmId)
+  }
+
+  if (filters?.dateFrom) {
+    query = query.gte('expense_date', filters.dateFrom)
+  }
+
+  if (filters?.dateTo) {
+    query = query.lte('expense_date', filters.dateTo)
+  }
+
+  const { data } = await query
+
+  const rows = data ?? []
+  return {
+    totalAmount: rows.reduce((s, e) => s + e.amount, 0),
+    totalLandlordCost: rows.reduce((s, e) => s + e.landlord_cost, 0),
+  }
 }

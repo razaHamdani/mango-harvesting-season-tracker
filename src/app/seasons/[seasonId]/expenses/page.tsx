@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
-import { getExpenses } from '@/lib/queries/expense-queries'
+import { getExpenses, getExpenseTotals } from '@/lib/queries/expense-queries'
 import { getSeasonFarms } from '@/lib/queries/activity-queries'
 import { ExpenseFilters } from '@/components/expense/expense-filters'
 import { ExpenseList } from '@/components/expense/expense-list'
@@ -23,8 +23,9 @@ export default async function ExpensesPage({
     dateTo: typeof sp.dateTo === 'string' ? sp.dateTo : undefined,
   }
 
-  const [expenses, farms] = await Promise.all([
+  const [{ items: expenses, nextCursor }, totals, farms] = await Promise.all([
     getExpenses(seasonId, filters),
+    getExpenseTotals(seasonId, filters),
     getSeasonFarms(seasonId),
   ])
 
@@ -51,7 +52,14 @@ export default async function ExpensesPage({
           </Button>
         </div>
       ) : (
-        <ExpenseList expenses={expenses} seasonId={seasonId} />
+        <ExpenseList
+          initialItems={expenses}
+          initialNextCursor={nextCursor}
+          seasonId={seasonId}
+          filters={filters}
+          totalAmount={totals.totalAmount}
+          totalLandlordCost={totals.totalLandlordCost}
+        />
       )}
     </div>
   )

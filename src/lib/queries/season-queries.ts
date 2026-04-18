@@ -24,61 +24,29 @@ export async function listSeasons(): Promise<SeasonWithStats[]> {
     return []
   }
 
-  const { data: seasons, error: seasonsError } = await supabase
+  // Single round-trip: embed season_farms → farms to compute acreage/count in JS.
+  const { data: seasons, error } = await supabase
     .from('seasons')
-    .select('*')
+    .select('*, season_farms(farm_id, farms(acreage))')
     .eq('owner_id', user.id)
     .order('year', { ascending: false })
 
-  if (seasonsError) {
-    throw new Error(seasonsError.message)
+  if (error) {
+    throw new Error(error.message)
   }
 
-  if (!seasons || seasons.length === 0) {
-    return []
+  type SeasonRow = Season & {
+    season_farms: Array<{ farm_id: string; farms: { acreage: number } | null }>
   }
 
-  const seasonIds = seasons.map((s) => s.id)
-
-  // Fetch season_farms links
-  const { data: seasonFarms, error: sfError } = await supabase
-    .from('season_farms')
-    .select('season_id, farm_id')
-    .in('season_id', seasonIds)
-
-  if (sfError) {
-    throw new Error(sfError.message)
-  }
-
-  // Fetch farms for acreage lookup
-  const farmIds = [...new Set((seasonFarms ?? []).map((sf) => sf.farm_id))]
-  let farmAcreageMap = new Map<string, number>()
-
-  if (farmIds.length > 0) {
-    const { data: farms, error: farmsError } = await supabase
-      .from('farms')
-      .select('id, acreage')
-      .in('id', farmIds)
-
-    if (farmsError) {
-      throw new Error(farmsError.message)
-    }
-
-    farmAcreageMap = new Map((farms ?? []).map((f) => [f.id, f.acreage]))
-  }
-
-  // Aggregate stats per season
-  const statsMap = new Map<string, { farm_count: number; total_acreage: number }>()
-  for (const sf of seasonFarms ?? []) {
-    const existing = statsMap.get(sf.season_id) ?? { farm_count: 0, total_acreage: 0 }
-    existing.farm_count += 1
-    existing.total_acreage += farmAcreageMap.get(sf.farm_id) ?? 0
-    statsMap.set(sf.season_id, existing)
-  }
-
-  return seasons.map((season) => {
-    const stats = statsMap.get(season.id) ?? { farm_count: 0, total_acreage: 0 }
-    return { ...season, ...stats }
+  return (seasons as unknown as SeasonRow[]).map((row) => {
+    const { season_farms, ...season } = row
+    const farm_count = season_farms.length
+    const total_acreage = season_farms.reduce(
+      (s, sf) => s + (sf.farms?.acreage ?? 0),
+      0,
+    )
+    return { ...season, farm_count, total_acreage }
   })
 }
 
@@ -93,58 +61,35 @@ export async function getSeasonById(seasonId: string): Promise<SeasonDetail | nu
     return null
   }
 
-  // Fetch the season
-  const { data: season, error: seasonError } = await supabase
+  // Round-trip 1: season + linked farms + installments via embedded joins.
+  const { data: row, error } = await supabase
     .from('seasons')
-    .select('*')
+    .select('*, season_farms(farms(*)), installments(*)')
     .eq('id', seasonId)
     .eq('owner_id', user.id)
     .single()
 
-  if (seasonError || !season) {
+  if (error || !row) {
     return null
   }
 
-  // Fetch associated farms via season_farms join
-  const { data: seasonFarms, error: sfError } = await supabase
-    .from('season_farms')
-    .select('farm_id')
-    .eq('season_id', seasonId)
-
-  if (sfError) {
-    throw new Error(sfError.message)
+  type SeasonRow = Season & {
+    season_farms: Array<{ farms: Farm | null }>
+    installments: Installment[]
   }
 
-  const farmIds = (seasonFarms ?? []).map((sf) => sf.farm_id)
-  let farms: Farm[] = []
+  const data = row as unknown as SeasonRow
+  const farms = (data.season_farms ?? [])
+    .map((sf) => sf.farms)
+    .filter((f): f is Farm => f !== null)
 
-  if (farmIds.length > 0) {
-    const { data: farmsData, error: farmsError } = await supabase
-      .from('farms')
-      .select('*')
-      .in('id', farmIds)
-
-    if (farmsError) {
-      throw new Error(farmsError.message)
-    }
-
-    farms = farmsData ?? []
-  }
+  const installments = (data.installments ?? []).sort(
+    (a, b) => a.installment_number - b.installment_number,
+  )
 
   const totalAcreage = farms.reduce((sum, f) => sum + f.acreage, 0)
 
-  // Fetch installments
-  const { data: installments, error: instError } = await supabase
-    .from('installments')
-    .select('*')
-    .eq('season_id', seasonId)
-    .order('installment_number', { ascending: true })
-
-  if (instError) {
-    throw new Error(instError.message)
-  }
-
-  // Compute boxes_received from harvest activities
+  // Round-trip 2: harvest aggregate (cannot be filtered inside an embedded relation).
   const { data: harvestData, error: harvestError } = await supabase
     .from('activities')
     .select('boxes_collected')
@@ -157,13 +102,13 @@ export async function getSeasonById(seasonId: string): Promise<SeasonDetail | nu
 
   const boxesReceived = (harvestData ?? []).reduce(
     (sum, a) => sum + (a.boxes_collected ?? 0),
-    0
+    0,
   )
 
   return {
-    ...season,
+    ...data,
     farms,
-    installments: installments ?? [],
+    installments,
     total_acreage: totalAcreage,
     boxes_received: boxesReceived,
   }
@@ -194,7 +139,6 @@ export async function getSeasonInsights(
     return null
   }
 
-  // Verify ownership before calling the RPC
   const { data: season, error: seasonError } = await supabase
     .from('seasons')
     .select('id')
@@ -268,7 +212,8 @@ export async function getDashboardData(): Promise<DashboardData> {
 
   if (!active) return result
 
-  const [insightsRes, unpaidInstRes, activitiesRes, seasonFarmsRes] = await Promise.all([
+  // Embed farms(name) in activities to eliminate the season_farms + farms round-trips.
+  const [insightsRes, unpaidInstRes, activitiesRes] = await Promise.all([
     supabase.rpc('get_season_insights', { p_season_id: active.id }),
     supabase
       .from('installments')
@@ -279,27 +224,16 @@ export async function getDashboardData(): Promise<DashboardData> {
       .limit(5),
     supabase
       .from('activities')
-      .select('*')
+      .select('*, farms(name)')
       .eq('season_id', active.id)
       .order('activity_date', { ascending: false })
       .limit(5),
-    supabase.from('season_farms').select('farm_id').eq('season_id', active.id),
   ])
 
-  const farmIds = (seasonFarmsRes.data ?? []).map((sf) => sf.farm_id)
-  let farmNameMap = new Map<string, string>()
-  if (farmIds.length > 0) {
-    const { data: farmsData } = await supabase
-      .from('farms')
-      .select('id, name')
-      .in('id', farmIds)
-    farmNameMap = new Map((farmsData ?? []).map((f) => [f.id, f.name]))
-  }
-
-  const recentActivities = (activitiesRes.data ?? []).map((a) => ({
-    ...a,
-    farm_name: farmNameMap.get(a.farm_id) ?? '—',
-  }))
+  type RawActivity = Activity & { farms: { name: string } | null }
+  const recentActivities = (activitiesRes.data as unknown as RawActivity[] ?? []).map(
+    ({ farms, ...a }) => ({ ...a, farm_name: farms?.name ?? '—' }),
+  )
 
   result.activeSeason = {
     ...active,

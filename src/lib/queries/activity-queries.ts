@@ -5,15 +5,25 @@ export type ActivityWithFarm = Activity & {
   farm_name: string
 }
 
+export type ActivityFilters = {
+  type?: string
+  farmId?: string
+  dateFrom?: string
+  dateTo?: string
+}
+
+export type ActivitiesPage = {
+  items: ActivityWithFarm[]
+  nextCursor: number | null
+}
+
+const PAGE_SIZE = 50
+
 export async function getActivities(
   seasonId: string,
-  filters?: {
-    type?: string
-    farmId?: string
-    dateFrom?: string
-    dateTo?: string
-  }
-): Promise<ActivityWithFarm[]> {
+  filters?: ActivityFilters,
+  offset = 0,
+): Promise<ActivitiesPage> {
   const supabase = await createClient()
 
   const {
@@ -21,12 +31,13 @@ export async function getActivities(
   } = await supabase.auth.getUser()
 
   if (!user) {
-    return []
+    return { items: [], nextCursor: null }
   }
 
+  // Embed farms(name) to resolve farm_name in one round-trip.
   let query = supabase
     .from('activities')
-    .select('*')
+    .select('*, farms(name)')
     .eq('season_id', seasonId)
 
   if (filters?.type) {
@@ -45,40 +56,27 @@ export async function getActivities(
     query = query.lte('activity_date', filters.dateTo)
   }
 
-  query = query
+  // Request one extra row to detect whether a next page exists.
+  const { data, error } = await query
     .order('activity_date', { ascending: false })
     .order('created_at', { ascending: false })
-
-  const { data: activities, error } = await query
+    .range(offset, offset + PAGE_SIZE)
 
   if (error) {
     throw new Error(error.message)
   }
 
-  if (!activities || activities.length === 0) {
-    return []
+  const rows = (data ?? []) as (Activity & { farms: { name: string } | null })[]
+  const hasMore = rows.length > PAGE_SIZE
+  const pageRows = rows.slice(0, PAGE_SIZE)
+
+  return {
+    items: pageRows.map(({ farms, ...rest }) => ({
+      ...rest,
+      farm_name: farms?.name ?? 'Unknown Farm',
+    })),
+    nextCursor: hasMore ? offset + PAGE_SIZE : null,
   }
-
-  // Fetch farm names for the activities
-  const farmIds = [...new Set(activities.map((a) => a.farm_id))]
-
-  const { data: farms, error: farmsError } = await supabase
-    .from('farms')
-    .select('id, name')
-    .in('id', farmIds)
-
-  if (farmsError) {
-    throw new Error(farmsError.message)
-  }
-
-  const farmNameMap = new Map<string, string>(
-    (farms ?? []).map((f) => [f.id, f.name])
-  )
-
-  return activities.map((activity) => ({
-    ...activity,
-    farm_name: farmNameMap.get(activity.farm_id) ?? 'Unknown Farm',
-  }))
 }
 
 export async function getSeasonFarms(seasonId: string): Promise<Farm[]> {
@@ -111,4 +109,3 @@ export async function getSeasonFarms(seasonId: string): Promise<Farm[]> {
 
   return farms ?? []
 }
-
