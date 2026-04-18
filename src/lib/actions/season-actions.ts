@@ -52,11 +52,8 @@ export async function createSeason(data: SeasonInput) {
   // Atomic: single Postgres transaction via RPC. If anything fails
   // (unique-index violation, RLS denial, FK error), nothing is inserted --
   // no orphan seasons, no partial installment schedules.
-  // Cast: generated types lag the schema until `supabase gen types` is re-run
-  // after the RPC migration lands.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const rpc = supabase.rpc as any
-  const { data: newSeasonId, error: rpcError } = await rpc(
+  const { data: newSeasonId, error: rpcError } = await (supabase as any).rpc(
     'create_season_with_children',
     {
       p_owner_id: user.id,
