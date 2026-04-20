@@ -128,3 +128,53 @@
     @apply font-sans;
   }
 }
+
+/* ── Print / Save-as-PDF ─────────────────────────────────────── */
+
+.print-only {
+  display: none;
+}
+
+@media print {
+  /* Force light colour scheme regardless of browser dark-mode setting */
+  html {
+    color-scheme: light !important;
+  }
+
+  body,
+  main,
+  [data-slot="card"] {
+    background: white !important;
+    color: black !important;
+  }
+
+  /* Hide navigation chrome, action buttons, dropdowns tagged for print */
+  [data-print="hide"] {
+    display: none !important;
+  }
+
+  /* Show print-only elements (the report header) */
+  .print-only {
+    display: block !important;
+  }
+
+  /* Keep cards intact across page breaks */
+  [data-slot="card"] {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    border: 1px solid #e5e7eb !important;
+  }
+
+  /* Recharts: ResponsiveContainer measures its parent via ResizeObserver,
+     which doesn't fire during print layout. Force a fixed size so the
+     SVG chart is always rendered at a readable width. */
+  .recharts-responsive-container {
+    width: 680px !important;
+    height: 288px !important;
+  }
+
+  /* Remove padding from the main content area */
+  main {
+    padding: 0 !important;
+  }
+}

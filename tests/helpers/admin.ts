@@ -17,7 +17,7 @@ export async function resetDb(_admin: SupabaseClient): Promise<void> {
   await pg.connect()
   try {
     await pg.query(`
-      TRUNCATE expenses, activities, installments, season_farms, seasons, workers, farms
+      TRUNCATE expenses, activities, installments, season_farms, seasons, workers, farms, profiles
       RESTART IDENTITY CASCADE
     `)
   } finally {

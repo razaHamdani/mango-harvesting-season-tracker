@@ -97,6 +97,7 @@ export function SeasonComparison({
         <select
           value={selectedId}
           onChange={handleChange}
+          data-print="hide"
           className="h-8 rounded-md border border-input bg-background px-2 text-sm"
         >
           <option value="">Select past season…</option>

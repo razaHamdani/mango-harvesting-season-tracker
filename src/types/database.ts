@@ -15,21 +15,30 @@ export interface Database {
       profiles: {
         Row: {
           id: string;
+          role: "landlord" | "contractor" | "admin";
           full_name: string;
           email: string;
+          phone: string | null;
           created_at: string;
+          updated_at: string;
         };
         Insert: {
           id: string;
+          role?: "landlord" | "contractor" | "admin";
           full_name: string;
           email: string;
+          phone?: string | null;
           created_at?: string;
+          updated_at?: string;
         };
         Update: {
           id?: string;
+          role?: "landlord" | "contractor" | "admin";
           full_name?: string;
           email?: string;
+          phone?: string | null;
           created_at?: string;
+          updated_at?: string;
         };
         Relationships: [];
       };
@@ -308,3 +317,4 @@ export type Worker = Tables<"workers">;
 export type SeasonStatus = Season["status"];
 export type ActivityType = Activity["type"];
 export type ExpenseCategory = Expense["category"];
+export type ProfileRole = Profile["role"];
