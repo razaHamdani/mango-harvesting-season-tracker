@@ -4,6 +4,7 @@ import { useState, useTransition, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import type { Farm, Season, ExpenseCategory } from '@/types/database'
+import type { ActivityWithFarm } from '@/lib/queries/activity-queries'
 import { createExpense } from '@/lib/actions/expense-actions'
 import { calculateLandlordCost } from '@/lib/utils/duty-split'
 import { Button } from '@/components/ui/button'
@@ -23,6 +24,7 @@ interface ExpenseFormProps {
   farms: Farm[]
   season: Pick<Season, 'id' | 'year' | 'spray_landlord_pct' | 'fertilizer_landlord_pct'>
   userId: string
+  activities?: ActivityWithFarm[]
 }
 
 const EXPENSE_CATEGORIES: { value: ExpenseCategory; label: string }[] = [
@@ -35,7 +37,7 @@ const EXPENSE_CATEGORIES: { value: ExpenseCategory; label: string }[] = [
 
 type FieldErrors = Record<string, string[] | undefined>
 
-export function ExpenseForm({ seasonId, farms, season, userId }: ExpenseFormProps) {
+export function ExpenseForm({ seasonId, farms, season, userId, activities = [] }: ExpenseFormProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [errors, setErrors] = useState<FieldErrors>({})
@@ -46,6 +48,7 @@ export function ExpenseForm({ seasonId, farms, season, userId }: ExpenseFormProp
     new Date().toISOString().split('T')[0]
   )
   const [farmId, setFarmId] = useState('')
+  const [linkedActivityId, setLinkedActivityId] = useState('')
   const [description, setDescription] = useState('')
   const [photoPath, setPhotoPath] = useState<string | null>(null)
 
@@ -82,6 +85,7 @@ export function ExpenseForm({ seasonId, farms, season, userId }: ExpenseFormProp
       formData.set('amount', amount)
       formData.set('expense_date', expenseDate)
       formData.set('farm_id', farmId)
+      formData.set('linked_activity_id', linkedActivityId)
       formData.set('description', description)
 
       if (photoPath) {
@@ -135,7 +139,7 @@ export function ExpenseForm({ seasonId, farms, season, userId }: ExpenseFormProp
         <Input
           id="amount"
           type="number"
-          min="0"
+          min="0.01"
           step="any"
           placeholder="0"
           value={amount}
@@ -209,6 +213,26 @@ export function ExpenseForm({ seasonId, farms, season, userId }: ExpenseFormProp
           </SelectContent>
         </Select>
       </div>
+
+      {/* Linked activity */}
+      {activities.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          <Label>Linked Activity (optional)</Label>
+          <Select value={linkedActivityId} onValueChange={(v) => setLinkedActivityId(v ?? '')}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="No linked activity" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">No linked activity</SelectItem>
+              {activities.map((a) => (
+                <SelectItem key={a.id} value={a.id}>
+                  {a.activity_date} — {a.type} ({a.farm_name})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       {/* Description */}
       <div className="flex flex-col gap-1.5">

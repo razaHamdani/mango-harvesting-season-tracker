@@ -4,7 +4,7 @@ import { getExpenses, getExpenseTotals } from '@/lib/queries/expense-queries'
 import { getSeasonFarms } from '@/lib/queries/activity-queries'
 import { ExpenseFilters } from '@/components/expense/expense-filters'
 import { ExpenseList } from '@/components/expense/expense-list'
-import { Button } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button'
 
 export default async function ExpensesPage({
   params,
@@ -33,9 +33,9 @@ export default async function ExpensesPage({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Expenses</h2>
-        <Button size="sm" render={<Link href={`/seasons/${seasonId}/expenses/new`} />}>
+        <Link href={`/seasons/${seasonId}/expenses/new`} className={buttonVariants({ size: 'sm' })}>
           Add Expense
-        </Button>
+        </Link>
       </div>
 
       <Suspense>
@@ -47,9 +47,9 @@ export default async function ExpensesPage({
           <p className="text-sm text-muted-foreground">
             No expenses recorded yet.
           </p>
-          <Button variant="link" size="sm" className="mt-2" render={<Link href={`/seasons/${seasonId}/expenses/new`} />}>
+          <Link href={`/seasons/${seasonId}/expenses/new`} className={buttonVariants({ variant: 'link', size: 'sm', className: 'mt-2' })}>
             Add your first expense
-          </Button>
+          </Link>
         </div>
       ) : (
         <ExpenseList

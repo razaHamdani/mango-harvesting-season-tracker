@@ -85,8 +85,12 @@ export function SeasonCreateForm({ farms }: SeasonCreateFormProps) {
   const installmentMismatch =
     predeterminedNum > 0 && Math.abs(installmentTotal - predeterminedNum) >= 0.01
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
+    if (!e.currentTarget.checkValidity()) {
+      e.currentTarget.reportValidity()
+      return
+    }
     setErrors({})
 
     const payload = {
@@ -265,7 +269,7 @@ export function SeasonCreateForm({ farms }: SeasonCreateFormProps) {
             <Input
               id="predetermined_amount"
               type="number"
-              min={1}
+              min="0.01"
               step="0.01"
               placeholder="e.g. 500000"
               value={predeterminedAmount}
@@ -352,7 +356,7 @@ export function SeasonCreateForm({ farms }: SeasonCreateFormProps) {
                 <Input
                   id={`installment-amount-${index}`}
                   type="number"
-                  min={1}
+                  min="0.01"
                   step="0.01"
                   placeholder="e.g. 100000"
                   value={row.amount}

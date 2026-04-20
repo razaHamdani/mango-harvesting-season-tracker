@@ -12,7 +12,7 @@ export async function createExpense(formData: FormData, seasonId: string) {
     expense_date: formData.get('expense_date'),
     farm_id: formData.get('farm_id'),
     description: formData.get('description'),
-    linked_activity_id: formData.get('linked_activity_id'),
+    linked_activity_id: formData.get('linked_activity_id') ?? undefined,
   })
 
   if (!parsed.success) {

@@ -1,7 +1,7 @@
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getSeasonById } from '@/lib/queries/season-queries'
-import { getSeasonFarms } from '@/lib/queries/activity-queries'
+import { getSeasonFarms, getActivities } from '@/lib/queries/activity-queries'
 import { ExpenseForm } from '@/components/expense/expense-form'
 
 export default async function NewExpensePage({
@@ -17,9 +17,10 @@ export default async function NewExpensePage({
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const [season, farms] = await Promise.all([
+  const [season, farms, { items: activities }] = await Promise.all([
     getSeasonById(seasonId),
     getSeasonFarms(seasonId),
+    getActivities(seasonId),
   ])
 
   if (!season) {
@@ -40,6 +41,7 @@ export default async function NewExpensePage({
         farms={farms}
         season={season}
         userId={user.id}
+        activities={activities}
       />
     </div>
   )
