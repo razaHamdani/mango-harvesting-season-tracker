@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { farmSchema } from '@/lib/utils/validators'
+import { ensureProfile } from '@/lib/queries/profile-queries'
 
 export async function createFarm(formData: FormData) {
   const parsed = farmSchema.safeParse({
@@ -23,6 +24,8 @@ export async function createFarm(formData: FormData) {
   if (!user) {
     return { error: { _form: ['You must be logged in.'] } }
   }
+
+  await ensureProfile()
 
   const { error } = await supabase.from('farms').insert({
     owner_id: user.id,

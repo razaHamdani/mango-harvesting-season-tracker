@@ -31,7 +31,9 @@ export default function RootLayout({
     >
       <body className="h-full">
         <AppShell>{children}</AppShell>
-        <Toaster />
+        <div data-print="hide">
+          <Toaster />
+        </div>
       </body>
     </html>
   );

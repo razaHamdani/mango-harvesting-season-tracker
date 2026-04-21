@@ -2,6 +2,7 @@ import { beforeEach, afterAll, describe, expect, it } from 'vitest'
 import { createAdminClient, resetDb } from './helpers/admin'
 import { createTestUser, deleteTestUser, TestUser } from './helpers/user'
 import { setCurrentClient, clearCurrentClient } from './setup'
+import { ensureProfile } from '@/lib/queries/profile-queries'
 
 describe('profiles', () => {
   const admin = createAdminClient()
@@ -47,6 +48,42 @@ describe('profiles', () => {
 
     expect(data!.full_name).toBe('Raza Hamdani')
     expect(data!.phone).toBe('0300-1234567')
+  })
+
+  it('stores role from signup metadata', async () => {
+    const admin = createAdminClient()
+    const suffix = Math.random().toString(36).slice(2, 10)
+    const { data: created } = await admin.auth.admin.createUser({
+      email: `test-rolemeta-${suffix}@example.com`,
+      password: `pass-${suffix}`,
+      email_confirm: true,
+      user_metadata: { full_name: 'Role Test', role: 'landlord' },
+    })
+    const userId = created!.user!.id
+    const { data } = await admin
+      .from('profiles')
+      .select('role')
+      .eq('id', userId)
+      .single()
+    expect(data!.role).toBe('landlord')
+    await admin.auth.admin.deleteUser(userId)
+  })
+
+  it('ensureProfile creates profile for user missing one', async () => {
+    const admin = createAdminClient()
+    // Delete the profile but keep auth user
+    await admin.from('profiles').delete().eq('id', user.id)
+
+    // ensureProfile should recreate it
+    await ensureProfile()
+
+    const { data } = await admin
+      .from('profiles')
+      .select('id')
+      .eq('id', user.id)
+      .single()
+    expect(data).not.toBeNull()
+    expect(data!.id).toBe(user.id)
   })
 
   it('blocks user from self-elevating their own role', async () => {

@@ -20,6 +20,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
+  const [role, setRole] = useState("landlord");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -36,7 +37,7 @@ export default function LoginPage() {
           email,
           password,
           options: {
-            data: { full_name: fullName },
+            data: { full_name: fullName, role },
           },
         });
         if (error) {
@@ -72,17 +73,31 @@ export default function LoginPage() {
         <CardContent>
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             {isSignUp && (
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="fullName">Full Name</Label>
-                <Input
-                  id="fullName"
-                  type="text"
-                  placeholder="Your full name"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  required
-                />
-              </div>
+              <>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="fullName">Full Name</Label>
+                  <Input
+                    id="fullName"
+                    type="text"
+                    placeholder="Your full name"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="role">Role</Label>
+                  <select
+                    id="role"
+                    value={role}
+                    onChange={(e) => setRole(e.target.value)}
+                    className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                    required
+                  >
+                    <option value="landlord">Landlord</option>
+                  </select>
+                </div>
+              </>
             )}
 
             <div className="flex flex-col gap-1.5">

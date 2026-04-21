@@ -1,10 +1,11 @@
 import Link from 'next/link'
 import { listSeasons } from '@/lib/queries/season-queries'
+import { getFarms } from '@/lib/queries/farm-queries'
 import { SeasonCard } from '@/components/season/season-card'
 import { Button } from '@/components/ui/button'
 
 export default async function SeasonsPage() {
-  const seasons = await listSeasons()
+  const [seasons, farms] = await Promise.all([listSeasons(), getFarms()])
 
   return (
     <div className="space-y-6">
@@ -15,7 +16,18 @@ export default async function SeasonsPage() {
             Manage your mango seasons
           </p>
         </div>
-        <Button render={<Link href="/seasons/new" />}>New Season</Button>
+        <div className="flex flex-col items-end gap-1">
+          <Button render={<Link href="/seasons/new" />}>New Season</Button>
+          {farms.length === 0 && (
+            <p className="text-xs text-muted-foreground">
+              Add a{' '}
+              <Link href="/farms" className="underline underline-offset-2 hover:text-foreground">
+                farm
+              </Link>{' '}
+              first
+            </p>
+          )}
+        </div>
       </div>
 
       {seasons.length === 0 ? (

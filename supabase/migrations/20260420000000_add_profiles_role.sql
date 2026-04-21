@@ -18,11 +18,12 @@ UPDATE public.profiles SET updated_at = created_at WHERE updated_at = now();
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO public.profiles (id, full_name, email)
+  INSERT INTO public.profiles (id, full_name, email, role)
   VALUES (
     new.id,
     COALESCE(new.raw_user_meta_data->>'full_name', ''),
-    new.email
+    new.email,
+    COALESCE(new.raw_user_meta_data->>'role', 'landlord')
   )
   ON CONFLICT (id) DO NOTHING;
   RETURN new;

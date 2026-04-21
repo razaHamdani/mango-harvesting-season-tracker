@@ -2,7 +2,7 @@
 
 ## Currently Working On
 
-- T11: Run full suite (`npm run test`), iterate until green — requires Docker Desktop + `npx supabase start`
+(none — all tasks complete)
 
 ## Completed
 
@@ -16,11 +16,12 @@
 - [x] T8: `tests/seasons.test.ts` — RC-1 bad installment sums, FK violation → full rollback, valid creation
 - [x] T9: `tests/photos.test.ts` — PHOTO-1 valid path persisted, spoofed/wrong-season path → null
 - [x] T10: `tests/README.md` — prereqs, run instructions, test inventory
+- [x] T11: Full suite green (9/9 tests pass)
+- [x] T12: Committed and pushed to origin/main
 
 ## Remaining
 
-- [ ] T11: Start Docker Desktop + `npx supabase start`, then `npm run test`; iterate until green
-- [ ] T12: Commit
+(none)
 
 ## Decisions & Deviations
 

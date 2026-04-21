@@ -10,12 +10,17 @@ export function PrintButton({ docTitle }: PrintButtonProps) {
   function handlePrint() {
     const prev = document.title
     document.title = docTitle
+    const restore = () => {
+      document.title = prev
+      window.removeEventListener('afterprint', restore)
+    }
+    window.addEventListener('afterprint', restore)
     window.print()
-    document.title = prev
   }
 
   return (
     <button
+      type="button"
       onClick={handlePrint}
       data-print="hide"
       className={buttonVariants({ variant: 'outline', size: 'sm' })}
