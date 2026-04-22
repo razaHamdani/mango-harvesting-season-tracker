@@ -1,6 +1,8 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { authLimiter, enforceLimit } from '@/lib/utils/rate-limiter'
+import { getClientIpFromHeaders } from '@/lib/utils/client-ip'
 
 const ALLOWED_ROLES = ['landlord'] as const
 type AllowedRole = typeof ALLOWED_ROLES[number]
@@ -34,6 +36,11 @@ export async function signUpUser(
   if (!isAllowedRole(role)) {
     return { error: 'Invalid role.' }
   }
+
+  // Rate limit signups by IP (fail-closed)
+  const ip = await getClientIpFromHeaders()
+  const { allowed } = await enforceLimit(authLimiter, `ip:${ip}`)
+  if (!allowed) return { error: 'Too many requests. Try again later.' }
 
   const supabase = await createClient()
 

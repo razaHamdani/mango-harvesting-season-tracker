@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { farmSchema } from '@/lib/utils/validators'
 import { ensureProfile } from '@/lib/queries/profile-queries'
+import { mutationLimiter, enforceLimit } from '@/lib/utils/rate-limiter'
 
 export async function createFarm(formData: FormData) {
   const parsed = farmSchema.safeParse({
@@ -24,6 +25,9 @@ export async function createFarm(formData: FormData) {
   if (!user) {
     return { error: { _form: ['You must be logged in.'] } }
   }
+
+  const { allowed: createAllowed } = await enforceLimit(mutationLimiter, `user:${user.id}`, true)
+  if (!createAllowed) return { error: { _form: ['Too many requests. Try again shortly.'] } }
 
   await ensureProfile()
 
@@ -62,6 +66,9 @@ export async function updateFarm(id: string, formData: FormData) {
     return { error: { _form: ['You must be logged in.'] } }
   }
 
+  const { allowed: updateAllowed } = await enforceLimit(mutationLimiter, `user:${user.id}`, true)
+  if (!updateAllowed) return { error: { _form: ['Too many requests. Try again shortly.'] } }
+
   const { error } = await supabase
     .from('farms')
     .update({
@@ -90,6 +97,9 @@ export async function deleteFarm(id: string) {
   if (!user) {
     return { error: { _form: ['You must be logged in.'] } }
   }
+
+  const { allowed: deleteAllowed } = await enforceLimit(mutationLimiter, `user:${user.id}`, true)
+  if (!deleteAllowed) return { error: { _form: ['Too many requests. Try again shortly.'] } }
 
   const { error } = await supabase
     .from('farms')

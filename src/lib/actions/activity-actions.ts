@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { activitySchema } from '@/lib/utils/validators'
 import { validatePhotoPath } from '@/lib/utils/validate-photo-path'
+import { mutationLimiter, enforceLimit } from '@/lib/utils/rate-limiter'
 
 export async function createActivity(formData: FormData, seasonId: string) {
   const parsed = activitySchema.safeParse({
@@ -33,6 +34,9 @@ export async function createActivity(formData: FormData, seasonId: string) {
   if (!user) {
     return { error: 'You must be logged in.' }
   }
+
+  const { allowed: createAllowed } = await enforceLimit(mutationLimiter, `user:${user.id}`, true)
+  if (!createAllowed) return { error: 'Too many requests. Try again shortly.' }
 
   // Ownership pre-check: verify the caller owns this season.
   const { data: ownedSeason } = await supabase
@@ -86,6 +90,9 @@ export async function deleteActivity(activityId: string, seasonId: string) {
   if (!user) {
     return { error: 'You must be logged in.' }
   }
+
+  const { allowed: deleteAllowed } = await enforceLimit(mutationLimiter, `user:${user.id}`, true)
+  if (!deleteAllowed) return { error: 'Too many requests. Try again shortly.' }
 
   // Ownership pre-check (two steps, both required):
   //

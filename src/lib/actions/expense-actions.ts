@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { expenseSchema } from '@/lib/utils/validators'
 import { calculateLandlordCost } from '@/lib/utils/duty-split'
 import { validatePhotoPath } from '@/lib/utils/validate-photo-path'
+import { mutationLimiter, enforceLimit } from '@/lib/utils/rate-limiter'
 
 export async function createExpense(formData: FormData, seasonId: string) {
   const parsed = expenseSchema.safeParse({
@@ -29,6 +30,9 @@ export async function createExpense(formData: FormData, seasonId: string) {
   if (!user) {
     return { error: 'You must be logged in.' }
   }
+
+  const { allowed } = await enforceLimit(mutationLimiter, `user:${user.id}`, true)
+  if (!allowed) return { error: 'Too many requests. Try again shortly.' }
 
   // Fetch season for duty split config
   const { data: season, error: seasonError } = await supabase
@@ -88,6 +92,9 @@ export async function deleteExpense(expenseId: string, seasonId: string) {
   if (!user) {
     return { error: 'You must be logged in.' }
   }
+
+  const { allowed } = await enforceLimit(mutationLimiter, `user:${user.id}`, true)
+  if (!allowed) return { error: 'Too many requests. Try again shortly.' }
 
   // Ownership pre-check (two steps, both required):
   //

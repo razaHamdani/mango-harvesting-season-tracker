@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { workerSchema } from '@/lib/utils/validators'
+import { mutationLimiter, enforceLimit } from '@/lib/utils/rate-limiter'
 
 export async function createWorker(formData: FormData) {
   const parsed = workerSchema.safeParse({
@@ -24,6 +25,9 @@ export async function createWorker(formData: FormData) {
   if (!user) {
     return { error: { _form: ['You must be logged in.'] } }
   }
+
+  const { allowed } = await enforceLimit(mutationLimiter, `user:${user.id}`, true)
+  if (!allowed) return { error: { _form: ['Too many requests. Try again shortly.'] } }
 
   const { error } = await supabase.from('workers').insert({
     owner_id: user.id,
@@ -62,6 +66,9 @@ export async function updateWorker(id: string, formData: FormData) {
     return { error: { _form: ['You must be logged in.'] } }
   }
 
+  const { allowed } = await enforceLimit(mutationLimiter, `user:${user.id}`, true)
+  if (!allowed) return { error: { _form: ['Too many requests. Try again shortly.'] } }
+
   const { error } = await supabase
     .from('workers')
     .update({
@@ -91,6 +98,9 @@ export async function toggleWorkerActive(id: string) {
   if (!user) {
     return { error: { _form: ['You must be logged in.'] } }
   }
+
+  const { allowed } = await enforceLimit(mutationLimiter, `user:${user.id}`, true)
+  if (!allowed) return { error: { _form: ['Too many requests. Try again shortly.'] } }
 
   const { data: worker, error: fetchError } = await supabase
     .from('workers')
@@ -128,6 +138,9 @@ export async function deleteWorker(id: string) {
   if (!user) {
     return { error: { _form: ['You must be logged in.'] } }
   }
+
+  const { allowed } = await enforceLimit(mutationLimiter, `user:${user.id}`, true)
+  if (!allowed) return { error: { _form: ['Too many requests. Try again shortly.'] } }
 
   const { error } = await supabase
     .from('workers')

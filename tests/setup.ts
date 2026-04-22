@@ -36,3 +36,14 @@ vi.mock('next/cache', () => ({
   revalidatePath: () => {},
   revalidateTag: () => {},
 }))
+
+// Rate limiter — stub all limiters as null so enforceLimit always allows.
+// This keeps mutation tests running at full speed without a real Redis connection.
+// To test rate-limiting behaviour, import enforceLimit directly and inject
+// a fake limiter (see tests/rate-limiter-integration.test.ts).
+vi.mock('@/lib/utils/rate-limiter', () => ({
+  authLimiter: null,
+  mutationLimiter: null,
+  uploadLimiter: null,
+  enforceLimit: async () => ({ allowed: true }),
+}))

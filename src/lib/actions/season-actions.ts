@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { seasonCreateSchema } from '@/lib/utils/validators'
+import { mutationLimiter, enforceLimit } from '@/lib/utils/rate-limiter'
 
 type SeasonInput = {
   year: number
@@ -48,6 +49,9 @@ export async function createSeason(data: SeasonInput) {
   if (!user) {
     return { error: { _form: ['You must be logged in.'] } }
   }
+
+  const { allowed } = await enforceLimit(mutationLimiter, `user:${user.id}`, true)
+  if (!allowed) return { error: { _form: ['Too many requests. Try again shortly.'] } }
 
   // Atomic: single Postgres transaction via RPC. If anything fails
   // (unique-index violation, RLS denial, FK error), nothing is inserted --
@@ -98,6 +102,9 @@ export async function deleteSeason(id: string) {
     return { error: { _form: ['You must be logged in.'] } }
   }
 
+  const { allowed } = await enforceLimit(mutationLimiter, `user:${user.id}`, true)
+  if (!allowed) return { error: { _form: ['Too many requests. Try again shortly.'] } }
+
   // Verify season is in draft status
   const { data: season } = await supabase
     .from('seasons')
@@ -141,6 +148,9 @@ export async function activateSeason(id: string) {
   if (!user) {
     return { error: { _form: ['You must be logged in.'] } }
   }
+
+  const { allowed } = await enforceLimit(mutationLimiter, `user:${user.id}`, true)
+  if (!allowed) return { error: { _form: ['Too many requests. Try again shortly.'] } }
 
   // Verify season exists and is in draft status
   const { data: season } = await supabase
@@ -194,6 +204,9 @@ export async function closeSeason(id: string) {
   if (!user) {
     return { error: { _form: ['You must be logged in.'] } }
   }
+
+  const { allowed } = await enforceLimit(mutationLimiter, `user:${user.id}`, true)
+  if (!allowed) return { error: { _form: ['Too many requests. Try again shortly.'] } }
 
   // Verify season exists and is active
   const { data: season } = await supabase

@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { validatePhotoPath } from '@/lib/utils/validate-photo-path'
+import { mutationLimiter, enforceLimit } from '@/lib/utils/rate-limiter'
 
 export async function recordPayment(
   installmentId: string,
@@ -18,6 +19,9 @@ export async function recordPayment(
   if (!user) {
     return { error: 'You must be logged in.' }
   }
+
+  const { allowed } = await enforceLimit(mutationLimiter, `user:${user.id}`, true)
+  if (!allowed) return { error: 'Too many requests. Try again shortly.' }
 
   // Extract and validate form fields
   const amountStr = formData.get('amount') as string
