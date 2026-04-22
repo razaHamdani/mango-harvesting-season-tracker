@@ -53,7 +53,6 @@ describe('photo_path — PHOTO-1 namespace validation', () => {
 
   function makeFormData(photoPath: string | null) {
     const fd = new FormData()
-    fd.set('season_id', seasonId)
     fd.set('farm_id', farmId)
     fd.set('type', 'spray')
     fd.set('activity_date', '2026-05-15')
@@ -64,8 +63,10 @@ describe('photo_path — PHOTO-1 namespace validation', () => {
   }
 
   it('persists a valid user-namespaced photo_path', async () => {
-    const validPath = `${user.id}/${seasonId}/activities/abc123.jpg`
-    const result = await createActivity(makeFormData(validPath))
+    // File name must be a UUID (enforced by the strict regex validator).
+    const fileId = 'c3d4e5f6-a7b8-9012-cdef-123456789012'
+    const validPath = `${user.id}/${seasonId}/activities/${fileId}.jpg`
+    const result = await createActivity(makeFormData(validPath), seasonId)
 
     expect(result).toHaveProperty('success', true)
     const activityId = (result as { activityId: string }).activityId
@@ -81,7 +82,7 @@ describe('photo_path — PHOTO-1 namespace validation', () => {
 
   it('nullifies a spoofed path from a different user', async () => {
     const spoofedPath = `other-user-id/${seasonId}/activities/spoofed.jpg`
-    const result = await createActivity(makeFormData(spoofedPath))
+    const result = await createActivity(makeFormData(spoofedPath), seasonId)
 
     expect(result).toHaveProperty('success', true)
     const activityId = (result as { activityId: string }).activityId
@@ -97,7 +98,7 @@ describe('photo_path — PHOTO-1 namespace validation', () => {
 
   it('nullifies a path from a different season', async () => {
     const wrongSeasonPath = `${user.id}/00000000-0000-0000-0000-000000000000/activities/x.jpg`
-    const result = await createActivity(makeFormData(wrongSeasonPath))
+    const result = await createActivity(makeFormData(wrongSeasonPath), seasonId)
 
     expect(result).toHaveProperty('success', true)
     const activityId = (result as { activityId: string }).activityId
@@ -112,7 +113,7 @@ describe('photo_path — PHOTO-1 namespace validation', () => {
   })
 
   it('persists null when no photo_path is submitted', async () => {
-    const result = await createActivity(makeFormData(null))
+    const result = await createActivity(makeFormData(null), seasonId)
 
     expect(result).toHaveProperty('success', true)
     const activityId = (result as { activityId: string }).activityId

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { validatePhotoPath } from '@/lib/utils/validate-photo-path'
 
 export async function recordPayment(
   installmentId: string,
@@ -33,12 +34,10 @@ export async function recordPayment(
 
   const notes = (formData.get('notes') as string) || null
 
-  // Photo (if any) was already uploaded client-side; validate namespace.
+  // Photo (if any) was already uploaded client-side; persist the path only
+  // if it passes strict format + ownership validation.
   const rawPhotoPath = formData.get('photo_path') as string | null
-  const receiptPhotoPath =
-    rawPhotoPath && rawPhotoPath.startsWith(`${user.id}/${seasonId}/payments/`)
-      ? rawPhotoPath
-      : null
+  const receiptPhotoPath = validatePhotoPath(rawPhotoPath, user.id, seasonId, 'payments')
 
   // Atomic update: only succeeds if paid_amount IS NULL (prevents TOCTOU
   // double-write from double-click / concurrent tabs). RLS still scopes by
@@ -57,7 +56,8 @@ export async function recordPayment(
     .select('id')
 
   if (updateError) {
-    return { error: updateError.message }
+    console.error('[recordPayment] update failed', updateError)
+    return { error: 'Failed to record payment.' }
   }
 
   if (!updated || updated.length === 0) {

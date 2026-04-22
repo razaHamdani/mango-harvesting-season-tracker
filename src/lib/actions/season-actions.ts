@@ -71,16 +71,16 @@ export async function createSeason(data: SeasonInput) {
   )
 
   if (rpcError || !newSeasonId) {
-    const msg = rpcError?.message ?? 'Failed to create season.'
     // Surface the active-season constraint as a friendly message.
-    if (msg.includes('one_active_season_per_owner')) {
+    if (rpcError?.message?.includes('one_active_season_per_owner')) {
       return {
         error: {
           _form: ['An active season already exists. Close it before creating a new one.'],
         },
       }
     }
-    return { error: { _form: [msg] } }
+    console.error('[createSeason] RPC error', rpcError)
+    return { error: { _form: ['Failed to create season.'] } }
   }
 
   revalidatePath('/seasons')
@@ -121,7 +121,8 @@ export async function deleteSeason(id: string) {
     .eq('owner_id', user.id)
 
   if (error) {
-    return { error: { _form: [error.message] } }
+    console.error('[deleteSeason] delete failed', error)
+    return { error: { _form: ['Failed to delete season.'] } }
   }
 
   revalidatePath('/seasons')
@@ -174,7 +175,8 @@ export async function activateSeason(id: string) {
   }
 
   if (error) {
-    return { error: { _form: [error.message] } }
+    console.error('[activateSeason] update failed', error)
+    return { error: { _form: ['Failed to activate season.'] } }
   }
 
   revalidatePath(`/seasons/${id}`)
@@ -216,7 +218,8 @@ export async function closeSeason(id: string) {
     .eq('owner_id', user.id)
 
   if (error) {
-    return { error: { _form: [error.message] } }
+    console.error('[closeSeason] update failed', error)
+    return { error: { _form: ['Failed to close season.'] } }
   }
 
   revalidatePath(`/seasons/${id}`)

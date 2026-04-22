@@ -2,8 +2,28 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { Database } from '@/types/database'
+import { checkRateLimit } from '@/lib/utils/rate-limiter'
+
+// 10 login/signup attempts per 5-minute window per IP
+const LOGIN_LIMIT = 10
+const LOGIN_WINDOW_MS = 5 * 60 * 1000
 
 export async function proxy(request: NextRequest) {
+  const { pathname } = request.nextUrl
+  const { method } = request
+
+  if (pathname === '/login' && method === 'POST') {
+    const ip =
+      request.headers.get('x-forwarded-for')?.split(',')[0].trim() ??
+      'unknown'
+    const { allowed } = checkRateLimit(`login:${ip}`, LOGIN_LIMIT, LOGIN_WINDOW_MS)
+    if (!allowed) {
+      return new NextResponse('Too many requests. Please try again later.', {
+        status: 429,
+        headers: { 'Retry-After': '300' },
+      })
+    }
+  }
   let supabaseResponse = NextResponse.next({
     request,
   })
@@ -35,8 +55,6 @@ export async function proxy(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser()
-
-  const { pathname } = request.nextUrl
 
   // Unauthenticated users get redirected to /login (except if already on /login)
   if (!user && pathname !== '/login') {

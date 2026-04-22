@@ -1,8 +1,8 @@
-import { beforeEach, afterAll, describe, expect, it } from 'vitest'
+import { beforeEach, beforeAll, afterAll, describe, expect, it } from 'vitest'
 import { createAdminClient, resetDb } from './helpers/admin'
 import { createTestUser, deleteTestUser, TestUser } from './helpers/user'
 import { setCurrentClient, clearCurrentClient } from './setup'
-import { createExpense } from '@/lib/actions/expense-actions'
+import { createExpense, deleteExpense } from '@/lib/actions/expense-actions'
 
 describe('createExpense', () => {
   const admin = createAdminClient()
@@ -111,7 +111,7 @@ describe('createExpense', () => {
     expect(row!.linked_activity_id).toBeNull()
   })
 
-  it('rejects negative amount', async () => {
+  it('rejects negative amount via Zod validation', async () => {
     const fd = new FormData()
     fd.set('category', 'labor')
     fd.set('amount', '-100')
@@ -124,5 +124,105 @@ describe('createExpense', () => {
     expect((result as { error: unknown }).error).toMatchObject({
       amount: expect.arrayContaining([expect.stringMatching(/greater than 0/i)]),
     })
+  })
+})
+
+/**
+ * Phase 1.2 — IDOR in deleteExpense.
+ * User B must not be able to delete User A's expense by guessing its UUID.
+ */
+describe('deleteExpense — IDOR protection', () => {
+  const admin = createAdminClient()
+  let userA: TestUser
+  let userB: TestUser
+  let userASeasonId: string
+  let userAExpenseId: string
+
+  beforeAll(async () => {
+    await resetDb(admin)
+    userA = await createTestUser('expense-a')
+    userB = await createTestUser('expense-b')
+
+    // Seed: farm + season + expense owned by user A
+    const { data: farm } = await admin
+      .from('farms')
+      .insert({ owner_id: userA.id, name: 'A Farm', acreage: 5 })
+      .select('id')
+      .single()
+    if (!farm) throw new Error('farm seed failed')
+
+    const { data: season } = await admin
+      .from('seasons')
+      .insert({
+        owner_id: userA.id,
+        year: 2026,
+        status: 'active',
+        contractor_name: 'A Contractor',
+        predetermined_amount: 100_000,
+        spray_landlord_pct: 50,
+        fertilizer_landlord_pct: 50,
+        agreed_boxes: 0,
+      })
+      .select('id')
+      .single()
+    if (!season) throw new Error('season seed failed')
+    userASeasonId = season.id
+
+    await admin
+      .from('season_farms')
+      .insert({ season_id: userASeasonId, farm_id: farm.id })
+
+    const { data: expense } = await admin
+      .from('expenses')
+      .insert({
+        season_id: userASeasonId,
+        category: 'labor',
+        amount: 5000,
+        landlord_cost: 5000,
+        expense_date: '2026-05-01',
+      })
+      .select('id')
+      .single()
+    if (!expense) throw new Error('expense seed failed')
+    userAExpenseId = expense.id
+  })
+
+  afterAll(async () => {
+    clearCurrentClient()
+    if (userA) await deleteTestUser(userA.id)
+    if (userB) await deleteTestUser(userB.id)
+  })
+
+  it('rejects when user B tries to delete user A expense', async () => {
+    // Run as user B
+    setCurrentClient(userB.client)
+    const result = await deleteExpense(userAExpenseId, userASeasonId)
+
+    expect(result).toHaveProperty('error')
+    expect(typeof (result as { error: string }).error).toBe('string')
+
+    // Row must still exist
+    const { data: row } = await admin
+      .from('expenses')
+      .select('id')
+      .eq('id', userAExpenseId)
+      .single()
+    expect(row).not.toBeNull()
+  })
+
+  it('allows the legitimate owner to delete their own expense', async () => {
+    // Run as user A
+    setCurrentClient(userA.client)
+    const result = await deleteExpense(userAExpenseId, userASeasonId)
+
+    expect(result).toMatchObject({ success: true })
+
+    // Row must be gone
+    const { data: row } = await admin
+      .from('expenses')
+      .select('id')
+      .eq('id', userAExpenseId)
+      .maybeSingle()
+    expect(row).toBeNull()
   })
 })

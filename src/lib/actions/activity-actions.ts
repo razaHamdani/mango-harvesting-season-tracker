@@ -3,8 +3,9 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { activitySchema } from '@/lib/utils/validators'
+import { validatePhotoPath } from '@/lib/utils/validate-photo-path'
 
-export async function createActivity(formData: FormData) {
+export async function createActivity(formData: FormData, seasonId: string) {
   const parsed = activitySchema.safeParse({
     type: formData.get('type'),
     farm_id: formData.get('farm_id'),
@@ -19,7 +20,6 @@ export async function createActivity(formData: FormData) {
     return { error: parsed.error.flatten().fieldErrors }
   }
 
-  const seasonId = formData.get('season_id') as string
   if (!seasonId) {
     return { error: 'Season ID is required.' }
   }
@@ -34,13 +34,22 @@ export async function createActivity(formData: FormData) {
     return { error: 'You must be logged in.' }
   }
 
-  // Photo (if any) was already uploaded client-side; we just persist the path.
-  // Validate the path is within the user's namespace to prevent spoofing.
+  // Ownership pre-check: verify the caller owns this season.
+  const { data: ownedSeason } = await supabase
+    .from('seasons')
+    .select('id')
+    .eq('id', seasonId)
+    .eq('owner_id', user.id)
+    .maybeSingle()
+
+  if (!ownedSeason) {
+    return { error: 'Season not found.' }
+  }
+
+  // Photo (if any) was already uploaded client-side; persist the path only
+  // if it passes strict format + ownership validation.
   const rawPhotoPath = formData.get('photo_path') as string | null
-  const photoPath =
-    rawPhotoPath && rawPhotoPath.startsWith(`${user.id}/${seasonId}/activities/`)
-      ? rawPhotoPath
-      : null
+  const photoPath = validatePhotoPath(rawPhotoPath, user.id, seasonId, 'activities')
 
   const { data: activity, error: insertError } = await supabase
     .from('activities')
@@ -59,7 +68,8 @@ export async function createActivity(formData: FormData) {
     .single()
 
   if (insertError || !activity) {
-    return { error: insertError?.message ?? 'Failed to create activity.' }
+    console.error('[createActivity] insert failed', insertError)
+    return { error: 'Failed to create activity.' }
   }
 
   revalidatePath(`/seasons/${seasonId}/activities`)
@@ -77,13 +87,42 @@ export async function deleteActivity(activityId: string, seasonId: string) {
     return { error: 'You must be logged in.' }
   }
 
+  // Ownership pre-check (two steps, both required):
+  //
+  // Step 1 — verify the caller owns the season the activity claims to belong to.
+  const { data: ownedSeason } = await supabase
+    .from('seasons')
+    .select('id')
+    .eq('id', seasonId)
+    .eq('owner_id', user.id)
+    .maybeSingle()
+
+  if (!ownedSeason) {
+    return { error: 'Activity not found.' }
+  }
+
+  // Step 2 — verify the activity actually belongs to that season.
+  const { data: ownedActivity } = await supabase
+    .from('activities')
+    .select('id')
+    .eq('id', activityId)
+    .eq('season_id', seasonId)
+    .maybeSingle()
+
+  if (!ownedActivity) {
+    return { error: 'Activity not found.' }
+  }
+
+  // Delete with both constraints to close any TOCTOU window.
   const { error } = await supabase
     .from('activities')
     .delete()
     .eq('id', activityId)
+    .eq('season_id', seasonId)
 
   if (error) {
-    return { error: error.message }
+    console.error('[deleteActivity] delete failed', error)
+    return { error: 'Failed to delete activity.' }
   }
 
   revalidatePath(`/seasons/${seasonId}/activities`)

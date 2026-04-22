@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { expenseSchema } from '@/lib/utils/validators'
 import { calculateLandlordCost } from '@/lib/utils/duty-split'
+import { validatePhotoPath } from '@/lib/utils/validate-photo-path'
 
 export async function createExpense(formData: FormData, seasonId: string) {
   const parsed = expenseSchema.safeParse({
@@ -48,12 +49,9 @@ export async function createExpense(formData: FormData, seasonId: string) {
   )
 
   // Photo (if any) was already uploaded client-side; persist the path only
-  // if it is within the caller's namespace.
+  // if it passes strict format + ownership validation.
   const rawPhotoPath = formData.get('photo_path') as string | null
-  const photoPath =
-    rawPhotoPath && rawPhotoPath.startsWith(`${user.id}/${seasonId}/expenses/`)
-      ? rawPhotoPath
-      : null
+  const photoPath = validatePhotoPath(rawPhotoPath, user.id, seasonId, 'expenses')
 
   const { data: expense, error: insertError } = await supabase
     .from('expenses')
@@ -72,7 +70,8 @@ export async function createExpense(formData: FormData, seasonId: string) {
     .single()
 
   if (insertError || !expense) {
-    return { error: insertError?.message ?? 'Failed to create expense.' }
+    console.error('[createExpense] insert failed', insertError)
+    return { error: 'Failed to create expense.' }
   }
 
   revalidatePath(`/seasons/${seasonId}/expenses`)
@@ -90,13 +89,45 @@ export async function deleteExpense(expenseId: string, seasonId: string) {
     return { error: 'You must be logged in.' }
   }
 
+  // Ownership pre-check (two steps, both required):
+  //
+  // Step 1 — verify the caller owns the season the expense claims to belong to.
+  // Prevents: user B supplies their own valid seasonId paired with user A's expenseId.
+  const { data: ownedSeason } = await supabase
+    .from('seasons')
+    .select('id')
+    .eq('id', seasonId)
+    .eq('owner_id', user.id)
+    .maybeSingle()
+
+  if (!ownedSeason) {
+    return { error: 'Expense not found.' }
+  }
+
+  // Step 2 — verify the expense actually belongs to that season.
+  // Prevents: user B supplies user A's seasonId + user A's expenseId
+  // (step 1 would fail that too, but belt-and-suspenders).
+  const { data: ownedExpense } = await supabase
+    .from('expenses')
+    .select('id')
+    .eq('id', expenseId)
+    .eq('season_id', seasonId)
+    .maybeSingle()
+
+  if (!ownedExpense) {
+    return { error: 'Expense not found.' }
+  }
+
+  // Delete with both constraints to close any TOCTOU window.
   const { error } = await supabase
     .from('expenses')
     .delete()
     .eq('id', expenseId)
+    .eq('season_id', seasonId)
 
   if (error) {
-    return { error: error.message }
+    console.error('[deleteExpense] delete failed', error)
+    return { error: 'Failed to delete expense.' }
   }
 
   revalidatePath(`/seasons/${seasonId}/expenses`)

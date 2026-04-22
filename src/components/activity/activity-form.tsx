@@ -52,7 +52,6 @@ export function ActivityForm({ seasonId, farms, userId }: ActivityFormProps) {
   function handleSubmit() {
     startTransition(async () => {
       const formData = new FormData()
-      formData.set('season_id', seasonId)
       formData.set('type', type)
       formData.set('farm_id', farmId)
       formData.set('activity_date', activityDate)
@@ -71,7 +70,7 @@ export function ActivityForm({ seasonId, farms, userId }: ActivityFormProps) {
         formData.set('photo_path', photoPath)
       }
 
-      const result = await createActivity(formData)
+      const result = await createActivity(formData, seasonId)
 
       if (result.error) {
         if (typeof result.error === 'string') {

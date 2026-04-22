@@ -34,7 +34,8 @@ export async function createFarm(formData: FormData) {
   })
 
   if (error) {
-    return { error: { _form: [error.message] } }
+    console.error('[createFarm] insert failed', error)
+    return { error: { _form: ['Failed to create farm.'] } }
   }
 
   revalidatePath('/farms')
@@ -71,7 +72,8 @@ export async function updateFarm(id: string, formData: FormData) {
     .eq('owner_id', user.id)
 
   if (error) {
-    return { error: { _form: [error.message] } }
+    console.error('[updateFarm] update failed', error)
+    return { error: { _form: ['Failed to update farm.'] } }
   }
 
   revalidatePath('/farms')
@@ -96,7 +98,8 @@ export async function deleteFarm(id: string) {
     .eq('owner_id', user.id)
 
   if (error) {
-    return { error: { _form: [error.message] } }
+    console.error('[deleteFarm] delete failed', error)
+    return { error: { _form: ['Failed to delete farm.'] } }
   }
 
   revalidatePath('/farms')

@@ -33,7 +33,8 @@ export async function createWorker(formData: FormData) {
   })
 
   if (error) {
-    return { error: { _form: [error.message] } }
+    console.error('[createWorker] insert failed', error)
+    return { error: { _form: ['Failed to create worker.'] } }
   }
 
   revalidatePath('/workers')
@@ -72,7 +73,8 @@ export async function updateWorker(id: string, formData: FormData) {
     .eq('owner_id', user.id)
 
   if (error) {
-    return { error: { _form: [error.message] } }
+    console.error('[updateWorker] update failed', error)
+    return { error: { _form: ['Failed to update worker.'] } }
   }
 
   revalidatePath('/workers')
@@ -108,7 +110,8 @@ export async function toggleWorkerActive(id: string) {
     .eq('owner_id', user.id)
 
   if (error) {
-    return { error: { _form: [error.message] } }
+    console.error('[toggleWorkerActive] update failed', error)
+    return { error: { _form: ['Failed to update worker.'] } }
   }
 
   revalidatePath('/workers')
@@ -133,7 +136,8 @@ export async function deleteWorker(id: string) {
     .eq('owner_id', user.id)
 
   if (error) {
-    return { error: { _form: [error.message] } }
+    console.error('[deleteWorker] delete failed', error)
+    return { error: { _form: ['Failed to delete worker.'] } }
   }
 
   revalidatePath('/workers')
