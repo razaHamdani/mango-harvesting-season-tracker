@@ -5,6 +5,7 @@ import {
 } from '@/lib/queries/insights-queries'
 import { getSeasonById } from '@/lib/queries/season-queries'
 import { getCurrentProfile } from '@/lib/queries/profile-queries'
+import { getCurrentUser } from '@/lib/queries/_user-context'
 import { createClient } from '@/lib/supabase/server'
 import { SummaryCards } from '@/components/insights/summary-cards'
 import { ExpenseBreakdownChart } from '@/components/insights/expense-breakdown-chart'
@@ -33,11 +34,9 @@ export default async function SeasonInsightsPage({
     notFound()
   }
 
-  // Past closed seasons (excluding current)
+  // Past closed seasons (excluding current) — user already verified via getSeasonById above.
+  const user = await getCurrentUser()
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
 
   let pastSeasons: { id: string; year: number }[] = []
   if (user) {

@@ -1,5 +1,5 @@
 import { notFound, redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import { getCurrentUser } from '@/lib/queries/_user-context'
 import { getSeasonById } from '@/lib/queries/season-queries'
 import { getSeasonFarms } from '@/lib/queries/activity-queries'
 import { ActivityForm } from '@/components/activity/activity-form'
@@ -11,10 +11,7 @@ export default async function NewActivityPage({
 }) {
   const { seasonId } = await params
 
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getCurrentUser()
   if (!user) redirect('/login')
 
   const [season, farms] = await Promise.all([

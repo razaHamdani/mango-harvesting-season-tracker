@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentUser } from './_user-context'
 import type { Activity, Farm } from '@/types/database'
 
 export type ActivityWithFarm = Activity & {
@@ -24,15 +25,10 @@ export async function getActivities(
   filters?: ActivityFilters,
   offset = 0,
 ): Promise<ActivitiesPage> {
+  const user = await getCurrentUser()
+  if (!user) return { items: [], nextCursor: null }
+
   const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    return { items: [], nextCursor: null }
-  }
 
   // Embed farms(name) to resolve farm_name in one round-trip.
   let query = supabase
@@ -82,30 +78,19 @@ export async function getActivities(
 export async function getSeasonFarms(seasonId: string): Promise<Farm[]> {
   const supabase = await createClient()
 
-  const { data: seasonFarms, error: sfError } = await supabase
+  // Single round-trip via embedded join (was: season_farms query + farms query).
+  const { data, error } = await supabase
     .from('season_farms')
-    .select('farm_id')
+    .select('farms(*)')
     .eq('season_id', seasonId)
+    .order('farms(name)')
 
-  if (sfError) {
-    throw new Error(sfError.message)
+  if (error) {
+    throw new Error(error.message)
   }
 
-  const farmIds = (seasonFarms ?? []).map((sf) => sf.farm_id)
-
-  if (farmIds.length === 0) {
-    return []
-  }
-
-  const { data: farms, error: farmsError } = await supabase
-    .from('farms')
-    .select('*')
-    .in('id', farmIds)
-    .order('name')
-
-  if (farmsError) {
-    throw new Error(farmsError.message)
-  }
-
-  return farms ?? []
+  type Row = { farms: Farm | null }
+  return (data as unknown as Row[])
+    .map((row) => row.farms)
+    .filter((f): f is Farm => f !== null)
 }

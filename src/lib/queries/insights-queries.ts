@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentUser } from './_user-context'
 
 type RawInsights = {
   predetermined_amount: number
@@ -61,14 +62,12 @@ function deriveMetrics(
 export async function getSeasonInsightsView(
   seasonId: string
 ): Promise<SeasonInsightsView | null> {
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getCurrentUser()
   if (!user) return null
 
-  // Ownership check
+  const supabase = await createClient()
+
+  // Ownership check (defense-in-depth: RPC also guards via auth.uid())
   const { data: season } = await supabase
     .from('seasons')
     .select('id')
@@ -89,8 +88,34 @@ export async function getSeasonComparison(
   seasonIds: string[]
 ): Promise<SeasonInsightsView[]> {
   const capped = seasonIds.slice(0, 3)
+  if (capped.length === 0) return []
+
+  // One auth call (cached by getCurrentUser), one batch ownership check,
+  // then all RPC calls in parallel — 4 round-trips max vs previous N*3.
+  const user = await getCurrentUser()
+  if (!user) return []
+
+  const supabase = await createClient()
+
+  const { data: owned } = await supabase
+    .from('seasons')
+    .select('id')
+    .in('id', capped)
+    .eq('owner_id', user.id)
+
+  const ownedIds = new Set((owned ?? []).map((s) => s.id))
+
   const results = await Promise.all(
-    capped.map((id) => getSeasonInsightsView(id))
+    capped
+      .filter((id) => ownedIds.has(id))
+      .map(async (id) => {
+        const { data, error } = await supabase.rpc('get_season_insights', {
+          p_season_id: id,
+        })
+        if (error || !data) return null
+        return deriveMetrics(id, data as unknown as RawInsights)
+      })
   )
+
   return results.filter((r): r is SeasonInsightsView => r !== null)
 }

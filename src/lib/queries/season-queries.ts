@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentUser } from './_user-context'
 import type { Season, Farm, Installment, Activity } from '@/types/database'
 
 export type SeasonWithStats = Season & {
@@ -14,15 +15,10 @@ export type SeasonDetail = Season & {
 }
 
 export async function listSeasons(): Promise<SeasonWithStats[]> {
+  const user = await getCurrentUser()
+  if (!user) return []
+
   const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    return []
-  }
 
   // Single round-trip: embed season_farms → farms to compute acreage/count in JS.
   const { data: seasons, error } = await supabase
@@ -51,15 +47,10 @@ export async function listSeasons(): Promise<SeasonWithStats[]> {
 }
 
 export async function getSeasonById(seasonId: string): Promise<SeasonDetail | null> {
+  const user = await getCurrentUser()
+  if (!user) return null
+
   const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    return null
-  }
 
   // Round-trip 1: season + linked farms + installments via embedded joins.
   const { data: row, error } = await supabase
@@ -129,15 +120,10 @@ export type SeasonInsights = {
 export async function getSeasonInsights(
   seasonId: string
 ): Promise<SeasonInsights | null> {
+  const user = await getCurrentUser()
+  if (!user) return null
+
   const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    return null
-  }
 
   const { data: season, error: seasonError } = await supabase
     .from('seasons')
@@ -175,11 +161,7 @@ export type DashboardData = {
 }
 
 export async function getDashboardData(): Promise<DashboardData> {
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getCurrentUser()
 
   const empty: DashboardData = {
     activeSeason: null,
@@ -190,22 +172,30 @@ export async function getDashboardData(): Promise<DashboardData> {
 
   if (!user) return empty
 
-  const [seasonsRes, farmsRes, workersRes] = await Promise.all([
+  const supabase = await createClient()
+
+  // Parallel: count queries + active season lookup (no JS-side filter needed).
+  const [seasonsCountRes, activeSeasonRes, farmsRes, workersRes] = await Promise.all([
+    supabase
+      .from('seasons')
+      .select('id', { count: 'exact', head: true })
+      .eq('owner_id', user.id),
     supabase
       .from('seasons')
       .select('*')
       .eq('owner_id', user.id)
-      .order('year', { ascending: false }),
+      .eq('status', 'active')
+      .limit(1)
+      .maybeSingle(),
     supabase.from('farms').select('id', { count: 'exact', head: true }).eq('owner_id', user.id),
     supabase.from('workers').select('id', { count: 'exact', head: true }).eq('owner_id', user.id),
   ])
 
-  const seasons = seasonsRes.data ?? []
-  const active = seasons.find((s) => s.status === 'active') ?? null
+  const active = activeSeasonRes.data ?? null
 
   const result: DashboardData = {
     activeSeason: null,
-    totalSeasons: seasons.length,
+    totalSeasons: seasonsCountRes.count ?? 0,
     totalFarms: farmsRes.count ?? 0,
     totalWorkers: workersRes.count ?? 0,
   }

@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentUser } from './_user-context'
 import type { Expense } from '@/types/database'
 
 export type ExpenseWithFarm = Expense & {
@@ -29,15 +30,10 @@ export async function getExpenses(
   filters?: ExpenseFilters,
   offset = 0,
 ): Promise<ExpensesPage> {
+  const user = await getCurrentUser()
+  if (!user) return { items: [], nextCursor: null }
+
   const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    return { items: [], nextCursor: null }
-  }
 
   // Embed farms(name) to resolve farm_name in one round-trip.
   let query = supabase
@@ -90,15 +86,10 @@ export async function getExpenseTotals(
   seasonId: string,
   filters?: ExpenseFilters,
 ): Promise<ExpenseTotals> {
+  const user = await getCurrentUser()
+  if (!user) return { totalAmount: 0, totalLandlordCost: 0 }
+
   const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    return { totalAmount: 0, totalLandlordCost: 0 }
-  }
 
   let query = supabase
     .from('expenses')

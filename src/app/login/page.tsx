@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { signInUser, signUpUser } from "@/lib/actions/auth-actions";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -29,30 +29,23 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
 
-    const supabase = createClient();
-
     try {
+      const formData = new FormData();
+      formData.set("email", email);
+      formData.set("password", password);
+
+      let result: { error?: string };
       if (isSignUp) {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: { full_name: fullName, role },
-          },
-        });
-        if (error) {
-          setError(error.message);
-          return;
-        }
+        formData.set("full_name", fullName);
+        formData.set("role", role);
+        result = await signUpUser(formData);
       } else {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (error) {
-          setError(error.message);
-          return;
-        }
+        result = await signInUser(formData);
+      }
+
+      if (result.error) {
+        setError(result.error);
+        return;
       }
 
       router.push("/dashboard");
