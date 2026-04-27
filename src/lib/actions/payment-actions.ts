@@ -23,6 +23,15 @@ export async function recordPayment(
   const { allowed } = await enforceLimit(mutationLimiter, `user:${user.id}`, true)
   if (!allowed) return { error: 'Too many requests. Try again shortly.' }
 
+  // Ownership pre-check: verify caller owns seasonId before touching any data.
+  const { data: ownedSeason } = await supabase
+    .from('seasons')
+    .select('id')
+    .eq('id', seasonId)
+    .eq('owner_id', user.id)
+    .maybeSingle()
+  if (!ownedSeason) return { error: 'Season not found.' }
+
   // Extract and validate form fields
   const amountStr = formData.get('amount') as string
   const amount = parseFloat(amountStr)

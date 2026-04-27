@@ -1,4 +1,4 @@
-import { beforeEach, afterAll, describe, expect, it } from 'vitest'
+import { beforeEach, beforeAll, afterAll, describe, expect, it } from 'vitest'
 import { createAdminClient, resetDb } from './helpers/admin'
 import { createTestUser, deleteTestUser, TestUser } from './helpers/user'
 import { setCurrentClient, clearCurrentClient } from './setup'
@@ -97,6 +97,14 @@ describe('recordPayment — RC-2 TOCTOU', () => {
     expect(row!.notes).toMatch(/^amount=(50000|60000)$/)
   })
 
+  it('allows the legitimate owner to record payment', async () => {
+    const fd = new FormData()
+    fd.set('amount', '100000')
+    fd.set('paid_date', '2026-05-20')
+    const result = await recordPayment(installmentId, fd, seasonId)
+    expect('success' in result && result.success).toBe(true)
+  })
+
   it('rejects a second sequential recording', async () => {
     const mk = (amount: number) => {
       const fd = new FormData()
@@ -117,5 +125,89 @@ describe('recordPayment — RC-2 TOCTOU', () => {
       .eq('id', installmentId)
       .single()
     expect(Number(row!.paid_amount)).toBe(100_000)
+  })
+})
+
+describe('recordPayment — ownership guard', () => {
+  const admin = createAdminClient()
+  let userA: TestUser
+  let userB: TestUser
+  let userASeasonId: string
+  let userAInstallmentId: string
+
+  beforeAll(async () => {
+    await resetDb(admin)
+    userA = await createTestUser('payment-owner-a')
+    userB = await createTestUser('payment-owner-b')
+
+    // Seed: farm + season + installment owned by user A (use admin to bypass RLS)
+    const { data: farm } = await admin
+      .from('farms')
+      .insert({ owner_id: userA.id, name: 'A Farm', acreage: 10 })
+      .select('id')
+      .single()
+    if (!farm) throw new Error('farm seed failed')
+
+    const { data: season } = await admin
+      .from('seasons')
+      .insert({
+        owner_id: userA.id,
+        year: 2026,
+        status: 'active',
+        contractor_name: 'A Contractor',
+        predetermined_amount: 100_000,
+        spray_landlord_pct: 100,
+        fertilizer_landlord_pct: 100,
+        agreed_boxes: 0,
+      })
+      .select('id')
+      .single()
+    if (!season) throw new Error('season seed failed')
+    userASeasonId = season.id
+
+    await admin
+      .from('season_farms')
+      .insert({ season_id: userASeasonId, farm_id: farm.id })
+
+    const { data: inst } = await admin
+      .from('installments')
+      .insert({
+        season_id: userASeasonId,
+        installment_number: 1,
+        expected_amount: 100_000,
+        due_date: '2026-06-01',
+      })
+      .select('id')
+      .single()
+    if (!inst) throw new Error('installment seed failed')
+    userAInstallmentId = inst.id
+  })
+
+  afterAll(async () => {
+    clearCurrentClient()
+    if (userA) await deleteTestUser(userA.id)
+    if (userB) await deleteTestUser(userB.id)
+  })
+
+  it('rejects when user B tries to record payment for user A season', async () => {
+    setCurrentClient(userB.client)
+
+    const fd = new FormData()
+    fd.set('amount', '50000')
+    fd.set('paid_date', '2026-05-20')
+
+    const result = await recordPayment(userAInstallmentId, fd, userASeasonId)
+
+    expect(result).toHaveProperty('error')
+    expect((result as { error: string }).error).toBe('Season not found.')
+
+    // Installment must remain unpaid
+    const { data: row } = await admin
+      .from('installments')
+      .select('paid_amount')
+      .eq('id', userAInstallmentId)
+      .single()
+    expect(row).not.toBeNull()
+    expect(row!.paid_amount).toBeNull()
   })
 })

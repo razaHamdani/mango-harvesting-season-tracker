@@ -3,6 +3,7 @@ import { createAdminClient, resetDb } from './helpers/admin'
 import { createTestUser, deleteTestUser, TestUser } from './helpers/user'
 import { setCurrentClient, clearCurrentClient } from './setup'
 import { createExpense, deleteExpense } from '@/lib/actions/expense-actions'
+import { getExpenses } from '@/lib/queries/expense-queries'
 
 describe('createExpense', () => {
   const admin = createAdminClient()
@@ -224,5 +225,70 @@ describe('deleteExpense — IDOR protection', () => {
       .eq('id', userAExpenseId)
       .maybeSingle()
     expect(row).toBeNull()
+  })
+})
+
+describe('getExpenses — ownership guard', () => {
+  const admin = createAdminClient()
+  let userA: TestUser
+  let userB: TestUser
+  let userASeasonId: string
+
+  beforeAll(async () => {
+    await resetDb(admin)
+    userA = await createTestUser('get-expense-a')
+    userB = await createTestUser('get-expense-b')
+
+    // Seed: farm + season + expense owned by user A
+    const { data: farm } = await admin
+      .from('farms')
+      .insert({ owner_id: userA.id, name: 'A Farm', acreage: 5 })
+      .select('id')
+      .single()
+    if (!farm) throw new Error('farm seed failed')
+
+    const { data: season } = await admin
+      .from('seasons')
+      .insert({
+        owner_id: userA.id,
+        year: 2026,
+        status: 'active',
+        contractor_name: 'A Contractor',
+        predetermined_amount: 100_000,
+        spray_landlord_pct: 50,
+        fertilizer_landlord_pct: 50,
+        agreed_boxes: 0,
+      })
+      .select('id')
+      .single()
+    if (!season) throw new Error('season seed failed')
+    userASeasonId = season.id
+
+    await admin
+      .from('season_farms')
+      .insert({ season_id: userASeasonId, farm_id: farm.id })
+
+    await admin
+      .from('expenses')
+      .insert({
+        season_id: userASeasonId,
+        category: 'labor',
+        amount: 5000,
+        landlord_cost: 2500,
+        expense_date: '2026-05-01',
+      })
+  })
+
+  afterAll(async () => {
+    clearCurrentClient()
+    if (userA) await deleteTestUser(userA.id)
+    if (userB) await deleteTestUser(userB.id)
+  })
+
+  it('returns empty page when user B requests user A season expenses', async () => {
+    setCurrentClient(userB.client)
+    const result = await getExpenses(userASeasonId)
+
+    expect(result).toEqual({ items: [], nextCursor: null })
   })
 })

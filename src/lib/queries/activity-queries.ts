@@ -30,6 +30,15 @@ export async function getActivities(
 
   const supabase = await createClient()
 
+  // Ownership pre-check: verify caller owns seasonId (defense-in-depth on top of RLS).
+  const { data: ownedSeason } = await supabase
+    .from('seasons')
+    .select('id')
+    .eq('id', seasonId)
+    .eq('owner_id', user.id)
+    .maybeSingle()
+  if (!ownedSeason) return { items: [], nextCursor: null }
+
   // Embed farms(name) to resolve farm_name in one round-trip.
   let query = supabase
     .from('activities')
