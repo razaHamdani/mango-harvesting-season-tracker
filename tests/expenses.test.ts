@@ -292,3 +292,110 @@ describe('getExpenses — ownership guard', () => {
     expect(result).toEqual({ items: [], nextCursor: null })
   })
 })
+
+/**
+ * 5D.3 — createExpense rejects a linked_activity_id owned by a different user.
+ *
+ * User A creates an expense in their own season but supplies user B's activity
+ * UUID as linked_activity_id. The ownership check in createExpense must reject
+ * this with "Linked activity not found."
+ */
+describe('createExpense — foreign linked_activity_id (5D.3)', () => {
+  const admin = createAdminClient()
+  let userA: TestUser
+  let userB: TestUser
+  let userASeasonId: string
+  let userBActivityId: string
+
+  beforeAll(async () => {
+    await resetDb(admin)
+    userA = await createTestUser('exp-5d3-a')
+    userB = await createTestUser('exp-5d3-b')
+
+    // User A: farm + season
+    const { data: farmA } = await admin
+      .from('farms')
+      .insert({ owner_id: userA.id, name: 'A Farm', acreage: 5 })
+      .select('id')
+      .single()
+    if (!farmA) throw new Error('farmA insert failed')
+
+    const { data: seasonA } = await admin
+      .from('seasons')
+      .insert({
+        owner_id: userA.id,
+        year: 2026,
+        status: 'active',
+        contractor_name: 'A',
+        predetermined_amount: 100_000,
+        spray_landlord_pct: 50,
+        fertilizer_landlord_pct: 50,
+        agreed_boxes: 0,
+      })
+      .select('id')
+      .single()
+    if (!seasonA) throw new Error('seasonA insert failed')
+    userASeasonId = seasonA.id
+    await admin.from('season_farms').insert({ season_id: userASeasonId, farm_id: farmA.id })
+
+    // User B: farm + season + activity
+    const { data: farmB } = await admin
+      .from('farms')
+      .insert({ owner_id: userB.id, name: 'B Farm', acreage: 5 })
+      .select('id')
+      .single()
+    if (!farmB) throw new Error('farmB insert failed')
+
+    const { data: seasonB } = await admin
+      .from('seasons')
+      .insert({
+        owner_id: userB.id,
+        year: 2026,
+        status: 'active',
+        contractor_name: 'B',
+        predetermined_amount: 100_000,
+        spray_landlord_pct: 50,
+        fertilizer_landlord_pct: 50,
+        agreed_boxes: 0,
+      })
+      .select('id')
+      .single()
+    if (!seasonB) throw new Error('seasonB insert failed')
+
+    const { data: activityB } = await admin
+      .from('activities')
+      .insert({
+        season_id: seasonB.id,
+        farm_id: farmB.id,
+        type: 'spray',
+        activity_date: '2026-05-01',
+        description: 'B spray',
+      })
+      .select('id')
+      .single()
+    if (!activityB) throw new Error('activityB insert failed')
+    userBActivityId = activityB.id
+  })
+
+  afterAll(async () => {
+    clearCurrentClient()
+    if (userA) await deleteTestUser(userA.id)
+    if (userB) await deleteTestUser(userB.id)
+  })
+
+  it('rejects "Linked activity not found" when activity belongs to a different user', async () => {
+    setCurrentClient(userA.client)
+    const fd = new FormData()
+    fd.set('category', 'spray')
+    fd.set('amount', '5000')
+    fd.set('expense_date', '2026-05-02')
+    fd.set('farm_id', '')
+    fd.set('description', '')
+    fd.set('linked_activity_id', userBActivityId)
+
+    const result = await createExpense(fd, userASeasonId)
+
+    expect(result).toHaveProperty('error')
+    expect((result as { error: string }).error).toBe('Linked activity not found.')
+  })
+})

@@ -52,6 +52,21 @@ export async function createExpense(formData: FormData, seasonId: string) {
     season
   )
 
+  // Verify linked_activity_id (if supplied) belongs to the same season.
+  // Season ownership above + this season-membership check ensures the activity
+  // is owned by the caller without a separate owner lookup.
+  if (parsed.data.linked_activity_id) {
+    const { data: linkedActivity } = await supabase
+      .from('activities')
+      .select('id')
+      .eq('id', parsed.data.linked_activity_id)
+      .eq('season_id', seasonId)
+      .maybeSingle()
+    if (!linkedActivity) {
+      return { error: 'Linked activity not found.' }
+    }
+  }
+
   // Photo (if any) was already uploaded client-side; persist the path only
   // if it passes strict format + ownership validation.
   const rawPhotoPath = formData.get('photo_path') as string | null
@@ -111,12 +126,11 @@ export async function deleteExpense(expenseId: string, seasonId: string) {
     return { error: 'Expense not found.' }
   }
 
-  // Step 2 — verify the expense actually belongs to that season.
-  // Prevents: user B supplies user A's seasonId + user A's expenseId
-  // (step 1 would fail that too, but belt-and-suspenders).
+  // Step 2 — verify the expense actually belongs to that season AND grab
+  // the photo_path so we can clean up the storage object after delete.
   const { data: ownedExpense } = await supabase
     .from('expenses')
-    .select('id')
+    .select('id, photo_path')
     .eq('id', expenseId)
     .eq('season_id', seasonId)
     .maybeSingle()
@@ -135,6 +149,17 @@ export async function deleteExpense(expenseId: string, seasonId: string) {
   if (error) {
     console.error('[deleteExpense] delete failed', error)
     return { error: 'Failed to delete expense.' }
+  }
+
+  // Best-effort storage cleanup. The DB row is already gone — a storage
+  // failure here only leaks an orphan object, not data integrity.
+  if (ownedExpense.photo_path) {
+    const { error: storageErr } = await supabase.storage
+      .from('aam-daata-photos')
+      .remove([ownedExpense.photo_path])
+    if (storageErr) {
+      console.error('[deleteExpense] storage cleanup failed', storageErr)
+    }
   }
 
   revalidatePath(`/seasons/${seasonId}/expenses`)

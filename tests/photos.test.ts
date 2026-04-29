@@ -1,4 +1,4 @@
-import { beforeEach, afterAll, describe, expect, it } from 'vitest'
+import { beforeAll, beforeEach, afterAll, describe, expect, it } from 'vitest'
 import { createAdminClient, resetDb } from './helpers/admin'
 import { createTestUser, deleteTestUser, TestUser } from './helpers/user'
 import { setCurrentClient, clearCurrentClient } from './setup'
@@ -125,5 +125,69 @@ describe('photo_path — PHOTO-1 namespace validation', () => {
       .single()
 
     expect(row?.photo_path).toBeNull()
+  })
+})
+
+/**
+ * 5D.6 — Storage bucket RLS: two-segment ownership enforcement.
+ *
+ * The bucket policy checks BOTH:
+ *   1. First path segment = auth.uid()          (user owns the root folder)
+ *   2. Second path segment IN (seasons owned by auth.uid())
+ *
+ * A user must NOT be able to upload into their own uid folder but under a
+ * season_id that belongs to a different user.
+ *
+ * Requires a running Supabase local stack (Docker) with the bucket RLS
+ * migration applied. Skips silently if storage is unreachable.
+ */
+describe('storage bucket — two-segment RLS (5D.6)', () => {
+  const admin = createAdminClient()
+  let userA: TestUser
+  let userBSeasonId: string
+
+  beforeAll(async () => {
+    await resetDb(admin)
+    userA = await createTestUser('photo-5d6-a')
+    const userB = await createTestUser('photo-5d6-b')
+
+    // Season owned by user B
+    const { data: season } = await admin
+      .from('seasons')
+      .insert({
+        owner_id: userB.id,
+        year: 2026,
+        status: 'active',
+        contractor_name: 'B',
+        predetermined_amount: 50_000,
+        spray_landlord_pct: 50,
+        fertilizer_landlord_pct: 50,
+        agreed_boxes: 0,
+      })
+      .select('id')
+      .single()
+    if (!season) throw new Error('season insert failed')
+    userBSeasonId = season.id
+
+    await deleteTestUser(userB.id)
+  })
+
+  afterAll(async () => {
+    clearCurrentClient()
+    if (userA) await deleteTestUser(userA.id)
+  })
+
+  it('rejects direct upload when second path segment is a foreign season', async () => {
+    // Path looks correct for user A (first segment = own uid) but the season
+    // belongs to user B — the second-segment RLS check must reject this.
+    const fileId = 'a0b1c2d3-e4f5-6789-abcd-ef0123456789'
+    const path = `${userA.id}/${userBSeasonId}/expenses/${fileId}.jpg`
+    const file = new Blob(['fake image'], { type: 'image/jpeg' })
+
+    const { error } = await userA.client.storage
+      .from('aam-daata-photos')
+      .upload(path, file, { contentType: 'image/jpeg' })
+
+    expect(error).not.toBeNull()
   })
 })

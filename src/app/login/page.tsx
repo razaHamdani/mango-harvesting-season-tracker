@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { signInUser, signUpUser } from "@/lib/actions/auth-actions";
+import { signInUser, signUpUser, resendConfirmation } from "@/lib/actions/auth-actions";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -23,6 +23,9 @@ export default function LoginPage() {
   const [role, setRole] = useState("landlord");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [pendingConfirmation, setPendingConfirmation] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendMessage, setResendMessage] = useState("");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -34,26 +37,83 @@ export default function LoginPage() {
       formData.set("email", email);
       formData.set("password", password);
 
-      let result: { error?: string };
       if (isSignUp) {
         formData.set("full_name", fullName);
         formData.set("role", role);
-        result = await signUpUser(formData);
+        const result = await signUpUser(formData);
+
+        if (result.error) {
+          setError(result.error);
+          return;
+        }
+
+        if (result.pendingConfirmation) {
+          setPendingConfirmation(true);
+          return;
+        }
+
+        router.push("/dashboard");
       } else {
-        result = await signInUser(formData);
-      }
+        const result = await signInUser(formData);
 
-      if (result.error) {
-        setError(result.error);
-        return;
-      }
+        if (result.error) {
+          setError(result.error);
+          return;
+        }
 
-      router.push("/dashboard");
+        router.push("/dashboard");
+      }
     } catch {
       setError("An unexpected error occurred. Please try again.");
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleResend() {
+    setResendLoading(true);
+    setResendMessage("");
+    await resendConfirmation(email);
+    setResendLoading(false);
+    setResendMessage("If an account exists for this email, a confirmation link has been sent.");
+  }
+
+  if (pendingConfirmation) {
+    return (
+      <div className="flex min-h-screen items-center justify-center px-4">
+        <Card className="w-full max-w-sm">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl font-bold">Check your email</CardTitle>
+            <CardDescription>
+              We sent a confirmation link to <strong>{email}</strong>. Click it
+              to activate your account, then sign in.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            {resendMessage && (
+              <p className="text-sm text-muted-foreground text-center">{resendMessage}</p>
+            )}
+            <Button
+              variant="outline"
+              onClick={handleResend}
+              disabled={resendLoading}
+            >
+              {resendLoading ? "Sending…" : "Resend confirmation email"}
+            </Button>
+            <button
+              type="button"
+              className="text-center text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
+              onClick={() => {
+                setPendingConfirmation(false);
+                setIsSignUp(false);
+              }}
+            >
+              Back to sign in
+            </button>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (

@@ -39,9 +39,17 @@ export async function proxy(request: NextRequest) {
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64')
   const csp = buildCsp(nonce)
 
-  // Attach nonce to the request headers so Server Components can read it.
+  // Short request ID for log correlation across proxy + Server Actions + Sentry.
+  // NOT set via Sentry.setTag here — that mutates the global hub and would bleed
+  // across concurrent requests. Instead, beforeSend in sentry.server.config.ts reads
+  // the x-request-id header that we attach below.
+  const requestId = crypto.randomUUID().slice(0, 8)
+
+  // Attach nonce + request ID to the request headers so Server Components and
+  // Server Actions can read them via next/headers.
   const requestHeaders = new Headers(request.headers)
   requestHeaders.set('x-nonce', nonce)
+  requestHeaders.set('x-request-id', requestId)
   requestHeaders.set('Content-Security-Policy', csp)
 
   // Pass the modified request headers into NextResponse.next so Next.js
@@ -93,8 +101,9 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // Set CSP and other security headers on the response.
+  // Set CSP, request ID, and other security headers on the response.
   supabaseResponse.headers.set('Content-Security-Policy', csp)
+  supabaseResponse.headers.set('x-request-id', requestId)
   supabaseResponse.headers.set('X-Frame-Options', 'DENY')
   supabaseResponse.headers.set('X-Content-Type-Options', 'nosniff')
   supabaseResponse.headers.set(

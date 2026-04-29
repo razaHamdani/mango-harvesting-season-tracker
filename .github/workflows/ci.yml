@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-typecheck:
+    name: Lint & Type-check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm run lint
+
+  test:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 1.226.4  # pinned — bump deliberately, not silently
+      - run: npm ci
+      - name: Start Supabase
+        run: supabase start
+      - name: Apply migrations
+        run: supabase migration up --local
+      - name: Write .env.test
+        run: |
+          SUPABASE_URL=$(supabase status --output json | jq -r '.api_url')
+          ANON_KEY=$(supabase status --output json | jq -r '.anon_key')
+          SERVICE_KEY=$(supabase status --output json | jq -r '.service_role_key')
+          DB_URL=$(supabase status --output json | jq -r '.db_url')
+          cat > .env.test <<EOF
+          NEXT_PUBLIC_SUPABASE_URL=${SUPABASE_URL}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY=${ANON_KEY}
+          SUPABASE_SERVICE_ROLE_KEY=${SERVICE_KEY}
+          SUPABASE_DB_URL=${DB_URL}
+          UPSTASH_REDIS_REST_URL=
+          UPSTASH_REDIS_REST_TOKEN=
+          SENTRY_DSN=
+          EOF
+      - name: Run tests
+        run: npm test
+      - name: Upload test results on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vitest-output
+          path: |
+            test-results/
+            *.log
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
+          SENTRY_DSN: ""
+          NEXT_PUBLIC_SENTRY_DSN: ""
+          UPSTASH_REDIS_REST_URL: ""
+          UPSTASH_REDIS_REST_TOKEN: ""

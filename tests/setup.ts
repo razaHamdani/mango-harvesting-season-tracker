@@ -44,6 +44,5 @@ vi.mock('next/cache', () => ({
 vi.mock('@/lib/utils/rate-limiter', () => ({
   authLimiter: null,
   mutationLimiter: null,
-  uploadLimiter: null,
   enforceLimit: async () => ({ allowed: true }),
 }))

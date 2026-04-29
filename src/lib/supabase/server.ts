@@ -1,8 +1,14 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { Database } from '@/types/database'
+import { attachRequestContext } from '@/lib/utils/request-context'
 
 export async function createClient() {
+  // Attach the requestId Sentry tag once per request. Every Server Action and
+  // Server Component goes through this entry point; this avoids touching all
+  // 22 actions individually.
+  await attachRequestContext()
+
   const cookieStore = await cookies()
 
   return createServerClient<Database>(

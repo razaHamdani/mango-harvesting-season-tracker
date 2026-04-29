@@ -108,10 +108,11 @@ export async function deleteActivity(activityId: string, seasonId: string) {
     return { error: 'Activity not found.' }
   }
 
-  // Step 2 — verify the activity actually belongs to that season.
+  // Step 2 — verify the activity actually belongs to that season AND grab
+  // the photo_path so we can clean up the storage object after delete.
   const { data: ownedActivity } = await supabase
     .from('activities')
-    .select('id')
+    .select('id, photo_path')
     .eq('id', activityId)
     .eq('season_id', seasonId)
     .maybeSingle()
@@ -130,6 +131,17 @@ export async function deleteActivity(activityId: string, seasonId: string) {
   if (error) {
     console.error('[deleteActivity] delete failed', error)
     return { error: 'Failed to delete activity.' }
+  }
+
+  // Best-effort storage cleanup. The DB row is already gone — a storage
+  // failure here only leaks an orphan object, not data integrity.
+  if (ownedActivity.photo_path) {
+    const { error: storageErr } = await supabase.storage
+      .from('aam-daata-photos')
+      .remove([ownedActivity.photo_path])
+    if (storageErr) {
+      console.error('[deleteActivity] storage cleanup failed', storageErr)
+    }
   }
 
   revalidatePath(`/seasons/${seasonId}/activities`)

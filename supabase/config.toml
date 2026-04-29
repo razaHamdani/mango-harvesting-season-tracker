@@ -109,14 +109,11 @@ port = 54324
 [storage]
 enabled = true
 # The maximum file size allowed (e.g. "5MB", "500KB").
-file_size_limit = "50MiB"
-
-# Uncomment to configure local storage buckets
-# [storage.buckets.images]
-# public = false
-# file_size_limit = "50MiB"
-# allowed_mime_types = ["image/png", "image/jpeg"]
-# objects_path = "./images"
+# Phase 5A.2: tightened from 50MiB to 10MiB. Per-bucket MIME + size limits
+# for `aam-daata-photos` are set by the migration
+# 20260427093748_lock_photo_bucket_limits.sql so that prod and dev share one
+# source of truth (the migration). Don't add a [storage.buckets.*] block here.
+file_size_limit = "10MiB"
 
 # Allow connections via S3 compatible clients
 [storage.s3_protocol]
@@ -218,7 +215,7 @@ enable_signup = true
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true
 # If enabled, users need to confirm their email address before signing in.
-enable_confirmations = false
+enable_confirmations = true
 # If enabled, users will need to reauthenticate or have logged in recently to change their password.
 secure_password_change = false
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.

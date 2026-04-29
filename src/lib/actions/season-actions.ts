@@ -121,6 +121,20 @@ export async function deleteSeason(id: string) {
     return { error: { _form: ['Only draft seasons can be deleted.'] } }
   }
 
+  // Gather child photo paths before the cascade delete drops them.
+  // Draft seasons usually don't have these, but the schema doesn't enforce that.
+  const [expensePhotos, activityPhotos, installmentPhotos] = await Promise.all([
+    supabase.from('expenses').select('photo_path').eq('season_id', id),
+    supabase.from('activities').select('photo_path').eq('season_id', id),
+    supabase.from('installments').select('receipt_photo_path').eq('season_id', id),
+  ])
+
+  const photoPaths = [
+    ...(expensePhotos.data ?? []).map((r) => r.photo_path),
+    ...(activityPhotos.data ?? []).map((r) => r.photo_path),
+    ...(installmentPhotos.data ?? []).map((r) => r.receipt_photo_path),
+  ].filter((p): p is string => Boolean(p))
+
   const { error } = await supabase
     .from('seasons')
     .delete()
@@ -130,6 +144,16 @@ export async function deleteSeason(id: string) {
   if (error) {
     console.error('[deleteSeason] delete failed', error)
     return { error: { _form: ['Failed to delete season.'] } }
+  }
+
+  // Best-effort storage cleanup. DB cascade already removed the rows.
+  if (photoPaths.length > 0) {
+    const { error: storageErr } = await supabase.storage
+      .from('aam-daata-photos')
+      .remove(photoPaths)
+    if (storageErr) {
+      console.error('[deleteSeason] storage cleanup failed', storageErr)
+    }
   }
 
   revalidatePath('/seasons')
@@ -224,6 +248,14 @@ export async function closeSeason(id: string) {
     return { error: { _form: ['Only active seasons can be closed.'] } }
   }
 
+  // Phase 5D.7 — warn (but allow) when unpaid installments still exist.
+  // The UI can surface the warning so the user confirms before closing.
+  const { count: unpaidCount } = await supabase
+    .from('installments')
+    .select('id', { count: 'exact', head: true })
+    .eq('season_id', id)
+    .is('paid_amount', null)
+
   const { error } = await supabase
     .from('seasons')
     .update({ status: 'closed', closed_at: new Date().toISOString() })
@@ -237,5 +269,12 @@ export async function closeSeason(id: string) {
 
   revalidatePath(`/seasons/${id}`)
   revalidatePath('/seasons')
-  return { success: true }
+
+  if (unpaidCount && unpaidCount > 0) {
+    return {
+      success: true as const,
+      warning: `${unpaidCount} installment${unpaidCount === 1 ? '' : 's'} still unpaid.`,
+    }
+  }
+  return { success: true as const }
 }

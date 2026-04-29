@@ -9,11 +9,14 @@
  *
  * Fail policies (decided):
  *   authLimiter     → fail-closed (false)  – auth endpoints never skip on outage
- *   uploadLimiter   → fail-closed (false)  – uploads never skip on outage
  *   mutationLimiter → fail-open  (true)    – harvest-day availability > abuse window
  *
  * No readLimiter: reads are protected by auth + RLS + RPC guard.
  * A read limiter would burn Upstash free-tier budget on every insights page load.
+ *
+ * No uploadLimiter: photos upload directly from the browser to Supabase Storage,
+ * which enforces per-user MIME + size limits at the bucket level. Rate-limiting
+ * after the upload is theatre.
  */
 
 import { Ratelimit } from '@upstash/ratelimit'
@@ -24,7 +27,6 @@ export type { Ratelimit }
 function createLimiters(): {
   auth: Ratelimit
   mutation: Ratelimit
-  upload: Ratelimit
 } | null {
   const url = process.env.UPSTASH_REDIS_REST_URL
   const token = process.env.UPSTASH_REDIS_REST_TOKEN
@@ -52,11 +54,6 @@ function createLimiters(): {
       limiter: Ratelimit.slidingWindow(60, '1 m'),
       prefix: 'rl:mut',
     }),
-    upload: new Ratelimit({
-      redis,
-      limiter: Ratelimit.slidingWindow(30, '1 m'),
-      prefix: 'rl:upload',
-    }),
   }
 }
 
@@ -67,9 +64,6 @@ export const authLimiter: Ratelimit | null = _limiters?.auth ?? null
 
 /** 60 mutations per minute per user. fail-open on Redis outage (harvest-day safety). */
 export const mutationLimiter: Ratelimit | null = _limiters?.mutation ?? null
-
-/** 30 uploads per minute per user. fail-closed on Redis outage. */
-export const uploadLimiter: Ratelimit | null = _limiters?.upload ?? null
 
 /**
  * Apply a rate limit.

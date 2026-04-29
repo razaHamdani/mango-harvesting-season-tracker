@@ -4,6 +4,7 @@ import { useRef, useState, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { XIcon, CameraIcon, Loader2Icon, AlertCircleIcon } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { compressForUpload, extensionForMime } from '@/lib/utils/compress-image'
 
 const BUCKET = 'aam-daata-photos'
 
@@ -20,6 +21,7 @@ interface PhotoUploadProps {
 
 type UploadState =
   | { kind: 'idle' }
+  | { kind: 'compressing' }
   | { kind: 'uploading' }
   | { kind: 'uploaded'; path: string }
   | { kind: 'error'; message: string; file: File }
@@ -31,10 +33,23 @@ export function PhotoUpload({ pathPrefix, name, onChange }: PhotoUploadProps) {
 
   const startUpload = useCallback(
     async (file: File) => {
+      setState({ kind: 'compressing' })
+
+      let uploadFile: File
+      try {
+        uploadFile = await compressForUpload(file)
+      } catch {
+        setState({ kind: 'error', message: 'Compression failed', file })
+        onChange?.(null)
+        return
+      }
+
       setState({ kind: 'uploading' })
 
-      // Generate a random filename so we don't need the DB record ID.
-      const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
+      // Derive extension from the actual output MIME, not the input filename.
+      // See extensionForMime() for rationale.
+      const ext = extensionForMime(uploadFile.type)
+
       const uuid =
         typeof crypto !== 'undefined' && 'randomUUID' in crypto
           ? crypto.randomUUID()
@@ -42,9 +57,10 @@ export function PhotoUpload({ pathPrefix, name, onChange }: PhotoUploadProps) {
       const path = `${pathPrefix}/${uuid}.${ext}`
 
       const supabase = createClient()
-      const { error } = await supabase.storage.from(BUCKET).upload(path, file, {
+      const { error } = await supabase.storage.from(BUCKET).upload(path, uploadFile, {
         cacheControl: '3600',
         upsert: false,
+        contentType: uploadFile.type,
       })
 
       if (error) {
@@ -93,6 +109,8 @@ export function PhotoUpload({ pathPrefix, name, onChange }: PhotoUploadProps) {
     if (state.kind === 'error') void startUpload(state.file)
   }, [state, startUpload])
 
+  const isBusy = state.kind === 'compressing' || state.kind === 'uploading'
+
   return (
     <div className="flex items-start gap-3">
       {preview ? (
@@ -102,7 +120,7 @@ export function PhotoUpload({ pathPrefix, name, onChange }: PhotoUploadProps) {
             alt="Selected photo preview"
             className="h-20 w-20 rounded-md object-cover"
           />
-          {state.kind === 'uploading' && (
+          {isBusy && (
             <div className="absolute inset-0 flex items-center justify-center rounded-md bg-black/40">
               <Loader2Icon className="h-5 w-5 animate-spin text-white" />
             </div>
@@ -113,6 +131,7 @@ export function PhotoUpload({ pathPrefix, name, onChange }: PhotoUploadProps) {
             size="icon-sm"
             className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90"
             onClick={handleRemove}
+            disabled={isBusy}
           >
             <XIcon className="h-3 w-3" />
             <span className="sr-only">Remove photo</span>
@@ -129,8 +148,11 @@ export function PhotoUpload({ pathPrefix, name, onChange }: PhotoUploadProps) {
       )}
 
       <div className="flex flex-col gap-1 text-xs">
+        {state.kind === 'compressing' && (
+          <span className="text-muted-foreground">Compressing image…</span>
+        )}
         {state.kind === 'uploading' && (
-          <span className="text-muted-foreground">Uploading...</span>
+          <span className="text-muted-foreground">Uploading…</span>
         )}
         {state.kind === 'uploaded' && (
           <span className="text-muted-foreground">Uploaded</span>
@@ -162,6 +184,7 @@ export function PhotoUpload({ pathPrefix, name, onChange }: PhotoUploadProps) {
         capture="environment"
         className="sr-only"
         onChange={handleFileChange}
+        disabled={isBusy}
       />
     </div>
   )
