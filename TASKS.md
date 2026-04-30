@@ -2,10 +2,14 @@
 
 ## Currently Working On
 
-Nothing — Phase 8 complete. See Remaining for deferred items.
+Nothing — Phase 9 complete. See Remaining for deferred items.
 
 ## Completed
 
+- [x] Phase 9A: Duplicate-email signup error — `signUpUser` now detects empty `identities` array (silent Supabase behavior) and "For security purposes" rate-limit error, returning `'Email already in use.'`; test added to `auth-confirmation.test.ts`
+- [x] Phase 9B: Email confirmation redirect — proxy forwards `token_hash` query param to `/auth/callback` instead of stripping it on redirect to `/login` (`proxy.ts`)
+- [x] Phase 9C: Linked expenses on activity rows — `ActivityWithFarm` extended with `linked_expenses[]`; `getActivities` batch-fetches linked expenses after page query; `ActivityList` adds Expenses column with deep-link navigation to `/seasons/{id}/expenses#expense-{id}`; expense `TableRow`s get `id` attributes; 2 new tests in `activities.test.ts`
+- [x] Phase 9D: Linked activity on expense rows — `ExpenseWithFarm` extended with `linked_activity`; `getExpenses` uses embedded join `activities!linked_activity_id`; `ExpenseList` adds Activity column with deep-link to `/seasons/{id}/activities#activity-{id}`; activity `TableRow`s get `id` attributes; 2 new tests in `expenses.test.ts`; colSpan footer updated; 85 tests passing
 - [x] Phase 8A: Predetermined amount validation — removed `min="0.01"` HTML attr from input; added JS check in `handleSubmit` setting `errors.predetermined_amount` with "Value must be greater than 0" (`season-create-form.tsx`)
 - [x] Phase 8B: CSP photo upload fix — `buildCsp()` now injects `NEXT_PUBLIC_SUPABASE_URL` into `connect-src` and `img-src` so browser-direct uploads work against local Supabase (`proxy.ts`)
 - [x] Phase 8C: Expense/Activity filter remount — added `key={JSON.stringify(filters)}` to `<ExpenseList>` and `<ActivityList>` so React replaces stale `useState` on filter change (`expenses/page.tsx`, `activities/page.tsx`)
