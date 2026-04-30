@@ -4,6 +4,7 @@ import type { Expense } from '@/types/database'
 
 export type ExpenseWithFarm = Expense & {
   farm_name: string | null
+  linked_activity: { id: string; type: string; activity_date: string } | null
 }
 
 export type ExpenseFilters = {
@@ -44,10 +45,10 @@ export async function getExpenses(
     .maybeSingle()
   if (!ownedSeason) return { items: [], nextCursor: null }
 
-  // Embed farms(name) to resolve farm_name in one round-trip.
+  // Embed farms(name) and linked activity to resolve in one round-trip.
   let query = supabase
     .from('expenses')
-    .select('*, farms(name)')
+    .select('*, farms(name), activities!linked_activity_id(id, type, activity_date)')
     .eq('season_id', seasonId)
 
   if (filters?.category) {
@@ -76,14 +77,18 @@ export async function getExpenses(
     throw new Error(error.message)
   }
 
-  const rows = (data ?? []) as unknown as (Expense & { farms: { name: string } | null })[]
+  const rows = (data ?? []) as unknown as (Expense & {
+    farms: { name: string } | null
+    activities: { id: string; type: string; activity_date: string } | null
+  })[]
   const hasMore = rows.length > PAGE_SIZE
   const pageRows = rows.slice(0, PAGE_SIZE)
 
   return {
-    items: pageRows.map(({ farms, ...rest }) => ({
+    items: pageRows.map(({ farms, activities, ...rest }) => ({
       ...rest,
       farm_name: rest.farm_id ? (farms?.name ?? null) : null,
+      linked_activity: activities ?? null,
     })),
     nextCursor: hasMore ? offset + PAGE_SIZE : null,
   }

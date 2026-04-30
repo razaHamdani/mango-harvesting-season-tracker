@@ -399,3 +399,99 @@ describe('createExpense — foreign linked_activity_id (5D.3)', () => {
     expect((result as { error: string }).error).toBe('Linked activity not found.')
   })
 })
+
+describe('getExpenses — linked activity', () => {
+  const admin = createAdminClient()
+  let user: TestUser
+  let seasonId: string
+  let farmId: string
+  let activityId: string
+
+  beforeAll(async () => {
+    user = await createTestUser('exp-linked-act')
+
+    const { data: farm } = await admin
+      .from('farms')
+      .insert({ owner_id: user.id, name: 'Linked Farm', acreage: 4 })
+      .select('id').single()
+    if (!farm) throw new Error('farm seed failed')
+    farmId = farm.id
+
+    const { data: season } = await admin
+      .from('seasons')
+      .insert({
+        owner_id: user.id,
+        year: 2026,
+        status: 'active',
+        contractor_name: 'Linker',
+        predetermined_amount: 50_000,
+        spray_landlord_pct: 100,
+        fertilizer_landlord_pct: 100,
+        agreed_boxes: 0,
+      })
+      .select('id').single()
+    if (!season) throw new Error('season seed failed')
+    seasonId = season.id
+
+    await admin.from('season_farms').insert({ season_id: seasonId, farm_id: farmId })
+
+    const { data: activity } = await admin
+      .from('activities')
+      .insert({ season_id: seasonId, farm_id: farmId, type: 'spray', activity_date: '2026-05-01' })
+      .select('id').single()
+    if (!activity) throw new Error('activity seed failed')
+    activityId = activity.id
+  })
+
+  afterAll(async () => {
+    clearCurrentClient()
+    if (user) await deleteTestUser(user.id)
+  })
+
+  it('returns linked_activity with id and type for a linked expense', async () => {
+    const { data: expense } = await admin
+      .from('expenses')
+      .insert({
+        season_id: seasonId,
+        farm_id: farmId,
+        category: 'spray',
+        amount: 3000,
+        landlord_cost: 3000,
+        expense_date: '2026-05-01',
+        linked_activity_id: activityId,
+      })
+      .select('id').single()
+    if (!expense) throw new Error('expense seed failed')
+
+    setCurrentClient(user.client)
+    const { items } = await getExpenses(seasonId)
+    const found = items.find((e) => e.id === expense.id)
+
+    expect(found).toBeDefined()
+    expect(found!.linked_activity).not.toBeNull()
+    expect(found!.linked_activity!.id).toBe(activityId)
+    expect(found!.linked_activity!.type).toBe('spray')
+  })
+
+  it('returns null linked_activity for an expense with no linked activity', async () => {
+    const { data: expense2 } = await admin
+      .from('expenses')
+      .insert({
+        season_id: seasonId,
+        farm_id: farmId,
+        category: 'labor',
+        amount: 1000,
+        landlord_cost: 1000,
+        expense_date: '2026-05-02',
+      })
+      .select('id').single()
+    if (!expense2) throw new Error('expense2 seed failed')
+
+    setCurrentClient(user.client)
+    const { items } = await getExpenses(seasonId)
+    const found = items.find((e) => e.id === expense2.id)
+
+    expect(found).toBeDefined()
+    expect(found!.linked_activity).toBeNull()
+  })
+})

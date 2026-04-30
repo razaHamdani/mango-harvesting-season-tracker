@@ -63,6 +63,12 @@ export async function signUpUser(
   })
 
   if (error) {
+    // When confirmations are enabled, Supabase rate-limits re-registration
+    // of the same email with this message. Surface it as a duplicate-email
+    // error instead of a generic failure.
+    if (error.message?.includes('For security purposes')) {
+      return { error: 'Email already in use.' }
+    }
     console.error('[signUpUser] auth error', error.message)
     return { error: 'Failed to create account.' }
   }

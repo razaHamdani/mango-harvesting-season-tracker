@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import Link from 'next/link'
 import { CameraIcon, Trash2Icon } from 'lucide-react'
 import type { ExpenseWithFarm, ExpenseFilters } from '@/lib/queries/expense-queries'
 import { deleteExpense } from '@/lib/actions/expense-actions'
@@ -80,6 +81,7 @@ export function ExpenseList({
             <TableHead>Date</TableHead>
             <TableHead>Category</TableHead>
             <TableHead>Description</TableHead>
+            <TableHead>Activity</TableHead>
             <TableHead className="text-right">Amount</TableHead>
             <TableHead className="text-right">Landlord Cost</TableHead>
             <TableHead>Farm</TableHead>
@@ -100,6 +102,18 @@ export function ExpenseList({
                 </Badge>
               </TableCell>
               <TableCell>{expense.description ?? '-'}</TableCell>
+              <TableCell>
+                {expense.linked_activity ? (
+                  <Link
+                    href={`/seasons/${seasonId}/activities#activity-${expense.linked_activity.id}`}
+                    className="text-sm text-primary underline-offset-4 hover:underline"
+                  >
+                    {expense.linked_activity.type} · {formatDate(expense.linked_activity.activity_date)}
+                  </Link>
+                ) : (
+                  <span className="text-muted-foreground">—</span>
+                )}
+              </TableCell>
               <TableCell className="text-right">
                 {formatPKR(expense.amount)}
               </TableCell>
@@ -137,7 +151,7 @@ export function ExpenseList({
             <TableCell className="text-right font-medium">
               {formatPKR(totalLandlordCost)}
             </TableCell>
-            <TableCell colSpan={3} />
+            <TableCell colSpan={4} />
           </TableRow>
         </TableFooter>
       </Table>
