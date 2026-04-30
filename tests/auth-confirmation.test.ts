@@ -67,6 +67,41 @@ describe('email confirmation (6C)', () => {
     expect(signInResult.error).toBeDefined()
   })
 
+  it('returns error when email is already registered', async () => {
+    const suffix = Math.random().toString(36).slice(2, 8)
+    const email = `dup-${suffix}@example.com`
+    const password = `P@ssw0rd-${suffix}`
+
+    const anonClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    })
+    setCurrentClient(anonClient)
+
+    const fd = () => {
+      const f = new FormData()
+      f.set('email', email)
+      f.set('password', password)
+      f.set('full_name', 'Dup Tester')
+      f.set('role', 'landlord')
+      return f
+    }
+
+    // First signup — should succeed with pending confirmation.
+    const first = await signUpUser(fd())
+    expect(first.error).toBeUndefined()
+    expect(first.pendingConfirmation).toBe(true)
+
+    // Record for cleanup.
+    const { data } = await admin.auth.admin.listUsers()
+    const created = data.users.find((u) => u.email === email)
+    if (created) createdUserIds.push(created.id)
+
+    // Second signup with same email — should surface our error.
+    const second = await signUpUser(fd())
+    expect(second.error).toBe('Email already in use.')
+    expect(second.pendingConfirmation).toBeUndefined()
+  })
+
   it('sign-in succeeds after admin-confirms the user', async () => {
     const suffix = Math.random().toString(36).slice(2, 8)
     const email = `confirm-ok-${suffix}@example.com`

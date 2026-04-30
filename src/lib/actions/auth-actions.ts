@@ -67,6 +67,12 @@ export async function signUpUser(
     return { error: 'Failed to create account.' }
   }
 
+  // Supabase silently succeeds for duplicate emails when confirmations are on,
+  // returning an empty identities array. Detect and surface this explicitly.
+  if (data.user?.identities?.length === 0) {
+    return { error: 'Email already in use.' }
+  }
+
   // When email confirmation is enabled, the session is null until the user
   // clicks the confirmation link. Signal the UI to show a pending state.
   if (!data.session) {
