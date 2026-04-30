@@ -7,11 +7,12 @@ import { getClientIp } from '@/lib/utils/client-ip'
 
 function buildCsp(nonce: string): string {
   const isDev = process.env.NODE_ENV === 'development'
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? ''
   const cspHeader = `
     default-src 'self';
     script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ''};
-    connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.upstash.io;
-    img-src 'self' data: blob: https://*.supabase.co;
+    connect-src 'self' ${supabaseUrl} https://*.supabase.co wss://*.supabase.co https://*.upstash.io;
+    img-src 'self' data: blob: ${supabaseUrl} https://*.supabase.co;
     style-src 'self' 'unsafe-inline';
     font-src 'self' data:;
     frame-ancestors 'none';
@@ -88,7 +89,9 @@ export async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   // Unauthenticated users → /login
-  if (!user && pathname !== '/login') {
+  // /auth/callback is whitelisted: it handles the email confirmation token
+  // exchange and must be reachable before a session exists.
+  if (!user && pathname !== '/login' && pathname !== '/auth/callback') {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)

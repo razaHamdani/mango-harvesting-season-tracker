@@ -51,6 +51,7 @@ export default async function ActivitiesPage({
         </div>
       ) : (
         <ActivityList
+          key={JSON.stringify(filters)}
           initialItems={activities}
           initialNextCursor={nextCursor}
           seasonId={seasonId}

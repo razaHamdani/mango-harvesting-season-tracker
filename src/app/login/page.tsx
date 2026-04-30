@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { signInUser, signUpUser, resendConfirmation } from "@/lib/actions/auth-actions";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,15 @@ export default function LoginPage() {
   const [role, setRole] = useState("landlord");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Surface auth callback errors (e.g. expired confirmation link).
+  // Reads from URL on mount — avoids useSearchParams which requires Suspense.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("error") === "confirmation-failed") {
+      setError("Confirmation link is invalid or has expired. Request a new one below.");
+    }
+  }, []);
   const [pendingConfirmation, setPendingConfirmation] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
   const [resendMessage, setResendMessage] = useState("");
@@ -78,6 +87,10 @@ export default function LoginPage() {
     setResendMessage("If an account exists for this email, a confirmation link has been sent.");
   }
 
+  const isLocalDev =
+    typeof window !== "undefined" &&
+    window.location.hostname === "localhost";
+
   if (pendingConfirmation) {
     return (
       <div className="flex min-h-screen items-center justify-center px-4">
@@ -90,6 +103,20 @@ export default function LoginPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
+            {isLocalDev && (
+              <p className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
+                Running locally? Emails are captured by Inbucket — check{" "}
+                <a
+                  href="http://localhost:54324"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline underline-offset-4 hover:text-foreground"
+                >
+                  localhost:54324
+                </a>{" "}
+                instead of your inbox.
+              </p>
+            )}
             {resendMessage && (
               <p className="text-sm text-muted-foreground text-center">{resendMessage}</p>
             )}
@@ -174,8 +201,13 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                minLength={6}
+                minLength={10}
               />
+              {isSignUp && (
+                <p className="text-xs text-muted-foreground">
+                  Min. 10 characters — must include uppercase, lowercase, and a number.
+                </p>
+              )}
             </div>
 
             {error && (

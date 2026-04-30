@@ -91,6 +91,13 @@ export function SeasonCreateForm({ farms }: SeasonCreateFormProps) {
       e.currentTarget.reportValidity()
       return
     }
+
+    const predNum = parseFloat(predeterminedAmount) || 0
+    if (predNum <= 0) {
+      setErrors({ predetermined_amount: ['Value must be greater than 0'] })
+      return
+    }
+
     setErrors({})
 
     const payload = {
@@ -269,7 +276,6 @@ export function SeasonCreateForm({ farms }: SeasonCreateFormProps) {
             <Input
               id="predetermined_amount"
               type="number"
-              min="0.01"
               step="0.01"
               placeholder="e.g. 500000"
               value={predeterminedAmount}

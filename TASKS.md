@@ -2,10 +2,16 @@
 
 ## Currently Working On
 
-(none — Phases 1–7 complete)
+Nothing — Phase 8 complete. See Remaining for deferred items.
 
 ## Completed
 
+- [x] Phase 8A: Predetermined amount validation — removed `min="0.01"` HTML attr from input; added JS check in `handleSubmit` setting `errors.predetermined_amount` with "Value must be greater than 0" (`season-create-form.tsx`)
+- [x] Phase 8B: CSP photo upload fix — `buildCsp()` now injects `NEXT_PUBLIC_SUPABASE_URL` into `connect-src` and `img-src` so browser-direct uploads work against local Supabase (`proxy.ts`)
+- [x] Phase 8C: Expense/Activity filter remount — added `key={JSON.stringify(filters)}` to `<ExpenseList>` and `<ActivityList>` so React replaces stale `useState` on filter change (`expenses/page.tsx`, `activities/page.tsx`)
+- [x] Auth callback route (`src/app/auth/callback/route.ts`) — exchanges email confirmation `token_hash` for session via `verifyOtp`; `/auth/callback` whitelisted in `proxy.ts`
+- [x] Login page: password requirements hint (min 10, upper+lower+digit), `minLength` fixed 6→10, Inbucket dev hint on confirmation screen
+- [x] Login page: removed `useSearchParams` (caused blank page without Suspense boundary), replaced with `useEffect` + `window.location.search`
 - [x] Phase 1: Critical security fixes (RPC auth guard, IDOR deletes, photo path validation, storage RLS, generic errors, role allowlist)
 - [x] Phase 2: Upstash Redis rate limiting (authLimiter, mutationLimiter, uploadLimiter, enforceLimit, client IP extraction, proxy wiring)
 - [x] Phase 3.1: `_user-context.ts` with React `cache()`-wrapped `getCurrentUser()` — refactored all query files + 3 pages

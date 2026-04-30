@@ -53,6 +53,7 @@ export default async function ExpensesPage({
         </div>
       ) : (
         <ExpenseList
+          key={JSON.stringify(filters)}
           initialItems={expenses}
           initialNextCursor={nextCursor}
           seasonId={seasonId}
