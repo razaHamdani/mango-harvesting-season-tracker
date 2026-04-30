@@ -93,6 +93,12 @@ export async function proxy(request: NextRequest) {
   // exchange and must be reachable before a session exists.
   if (!user && pathname !== '/login' && pathname !== '/auth/callback') {
     const url = request.nextUrl.clone()
+    // Supabase's /auth/v1/verify redirects to site_url (/) with token_hash
+    // in query params. Forward to /auth/callback so the route can exchange it.
+    if (request.nextUrl.searchParams.get('token_hash')) {
+      url.pathname = '/auth/callback'
+      return NextResponse.redirect(url)
+    }
     url.pathname = '/login'
     return NextResponse.redirect(url)
   }
