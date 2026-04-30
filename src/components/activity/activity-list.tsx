@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import Link from 'next/link'
 import { CameraIcon, Trash2Icon } from 'lucide-react'
 import type { ActivityWithFarm, ActivityFilters } from '@/lib/queries/activity-queries'
 import { deleteActivity } from '@/lib/actions/activity-actions'
@@ -90,12 +91,13 @@ export function ActivityList({
             <TableHead>Farm</TableHead>
             <TableHead>Details</TableHead>
             <TableHead className="w-10">Photo</TableHead>
+            <TableHead>Expenses</TableHead>
             <TableHead className="w-10">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {items.map((activity) => (
-            <TableRow key={activity.id}>
+            <TableRow key={activity.id} id={`activity-${activity.id}`}>
               <TableCell>{formatDate(activity.activity_date)}</TableCell>
               <TableCell>
                 <Badge
@@ -110,6 +112,23 @@ export function ActivityList({
               <TableCell>
                 {activity.photo_path && (
                   <CameraIcon className="h-4 w-4 text-muted-foreground" />
+                )}
+              </TableCell>
+              <TableCell>
+                {activity.linked_expenses.length === 0 ? (
+                  <span className="text-muted-foreground">—</span>
+                ) : (
+                  <div className="flex flex-col gap-1">
+                    {activity.linked_expenses.map((e) => (
+                      <Link
+                        key={e.id}
+                        href={`/seasons/${seasonId}/expenses#expense-${e.id}`}
+                        className="text-sm text-primary underline-offset-4 hover:underline"
+                      >
+                        {e.description ?? e.category} · PKR {e.amount.toLocaleString()}
+                      </Link>
+                    ))}
+                  </div>
                 )}
               </TableCell>
               <TableCell>

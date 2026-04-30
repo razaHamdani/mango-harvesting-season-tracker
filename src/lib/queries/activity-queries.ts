@@ -4,6 +4,7 @@ import type { Activity, Farm } from '@/types/database'
 
 export type ActivityWithFarm = Activity & {
   farm_name: string
+  linked_expenses: { id: string; category: string; description: string | null; amount: number }[]
 }
 
 export type ActivityFilters = {
@@ -75,10 +76,35 @@ export async function getActivities(
   const hasMore = rows.length > PAGE_SIZE
   const pageRows = rows.slice(0, PAGE_SIZE)
 
+  // Batch-fetch linked expenses for this page of activities in one query.
+  const activityIds = pageRows.map((r) => r.id)
+  let linkedExpensesMap: Record<string, { id: string; category: string; description: string | null; amount: number }[]> = {}
+
+  if (activityIds.length > 0) {
+    const { data: expenseRows } = await supabase
+      .from('expenses')
+      .select('id, category, description, amount, linked_activity_id')
+      .in('linked_activity_id', activityIds)
+
+    for (const e of expenseRows ?? []) {
+      if (!e.linked_activity_id) continue
+      if (!linkedExpensesMap[e.linked_activity_id]) {
+        linkedExpensesMap[e.linked_activity_id] = []
+      }
+      linkedExpensesMap[e.linked_activity_id].push({
+        id: e.id,
+        category: e.category,
+        description: e.description,
+        amount: e.amount,
+      })
+    }
+  }
+
   return {
     items: pageRows.map(({ farms, ...rest }) => ({
       ...rest,
       farm_name: farms?.name ?? 'Unknown Farm',
+      linked_expenses: linkedExpensesMap[rest.id] ?? [],
     })),
     nextCursor: hasMore ? offset + PAGE_SIZE : null,
   }

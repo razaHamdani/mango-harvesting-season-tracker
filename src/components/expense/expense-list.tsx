@@ -89,7 +89,7 @@ export function ExpenseList({
         </TableHeader>
         <TableBody>
           {items.map((expense) => (
-            <TableRow key={expense.id}>
+            <TableRow key={expense.id} id={`expense-${expense.id}`}>
               <TableCell>{formatDate(expense.expense_date)}</TableCell>
               <TableCell>
                 <Badge
