@@ -2,8 +2,9 @@
 
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
-import { CameraIcon, Trash2Icon } from 'lucide-react'
+import { Trash2Icon } from 'lucide-react'
 import type { ExpenseWithFarm, ExpenseFilters } from '@/lib/queries/expense-queries'
+import { PhotoThumbnailClient } from '@/components/photo/photo-thumbnail-client'
 import { deleteExpense } from '@/lib/actions/expense-actions'
 import { loadMoreExpenses } from '@/lib/actions/list-actions'
 import { formatPKR, formatDate } from '@/lib/utils/format'
@@ -123,7 +124,7 @@ export function ExpenseList({
               <TableCell>{expense.farm_name ?? '-'}</TableCell>
               <TableCell>
                 {expense.photo_path && (
-                  <CameraIcon className="h-4 w-4 text-muted-foreground" />
+                  <PhotoThumbnailClient path={expense.photo_path} alt="Receipt photo" />
                 )}
               </TableCell>
               <TableCell>

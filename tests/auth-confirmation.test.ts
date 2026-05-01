@@ -67,6 +67,23 @@ describe('email confirmation (6C)', () => {
     expect(signInResult.error).toBeDefined()
   })
 
+  it('returns error for malformed email address', async () => {
+    const anonClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    })
+    setCurrentClient(anonClient)
+
+    const fd = new FormData()
+    fd.set('email', 'not-an-email')
+    fd.set('password', 'P@ssw0rd123')
+    fd.set('full_name', 'Bad Email')
+    fd.set('role', 'landlord')
+
+    const result = await signUpUser(fd)
+    expect(result.error).toBe('Enter a valid email address.')
+    expect(result.pendingConfirmation).toBeUndefined()
+  })
+
   it('returns error when email is already registered', async () => {
     const suffix = Math.random().toString(36).slice(2, 8)
     const email = `dup-${suffix}@example.com`
@@ -96,9 +113,9 @@ describe('email confirmation (6C)', () => {
     const created = data.users.find((u) => u.email === email)
     if (created) createdUserIds.push(created.id)
 
-    // Second signup with same email — should surface our error.
+    // Second signup with same email — RPC pre-check surfaces this before signUp.
     const second = await signUpUser(fd())
-    expect(second.error).toBe('Email already in use.')
+    expect(second.error).toBe('Email already registered.')
     expect(second.pendingConfirmation).toBeUndefined()
   })
 

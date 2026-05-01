@@ -291,6 +291,10 @@ export interface Database {
         Args: { p_season_id: string };
         Returns: Json;
       };
+      email_exists: {
+        Args: { check_email: string };
+        Returns: boolean;
+      };
     };
     Views: Record<string, never>;
     Enums: Record<string, never>;

@@ -2,8 +2,9 @@
 
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
-import { CameraIcon, Trash2Icon } from 'lucide-react'
+import { Trash2Icon } from 'lucide-react'
 import type { ActivityWithFarm, ActivityFilters } from '@/lib/queries/activity-queries'
+import { PhotoThumbnailClient } from '@/components/photo/photo-thumbnail-client'
 import { deleteActivity } from '@/lib/actions/activity-actions'
 import { loadMoreActivities } from '@/lib/actions/list-actions'
 import { formatDate } from '@/lib/utils/format'
@@ -111,7 +112,7 @@ export function ActivityList({
               <TableCell>{getDetails(activity)}</TableCell>
               <TableCell>
                 {activity.photo_path && (
-                  <CameraIcon className="h-4 w-4 text-muted-foreground" />
+                  <PhotoThumbnailClient path={activity.photo_path} alt="Activity photo" />
                 )}
               </TableCell>
               <TableCell>

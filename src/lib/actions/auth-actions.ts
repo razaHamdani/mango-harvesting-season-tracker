@@ -7,6 +7,9 @@ import { getClientIpFromHeaders } from '@/lib/utils/client-ip'
 const ALLOWED_ROLES = ['landlord'] as const
 type AllowedRole = typeof ALLOWED_ROLES[number]
 
+// RFC 5322-inspired check: local@domain.tld with no whitespace.
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
 function isAllowedRole(role: unknown): role is AllowedRole {
   return ALLOWED_ROLES.includes(role as AllowedRole)
 }
@@ -44,6 +47,11 @@ export async function signUpUser(
     return { error: 'Invalid role.' }
   }
 
+  const email = (formData.get('email') as string).trim()
+  if (!EMAIL_RE.test(email)) {
+    return { error: 'Enter a valid email address.' }
+  }
+
   // Rate limit signups by IP (fail-closed)
   const ip = await getClientIpFromHeaders()
   const { allowed } = await enforceLimit(authLimiter, `ip:${ip}`)
@@ -51,8 +59,19 @@ export async function signUpUser(
 
   const supabase = await createClient()
 
+  // Explicit duplicate-email pre-check. Fail-closed: if the RPC itself errors,
+  // do not proceed to signUp (unknown state is worse than a retry prompt).
+  const { data: exists, error: rpcError } = await supabase.rpc('email_exists', { check_email: email })
+  if (rpcError) {
+    console.error('[signUpUser] email_exists rpc error', rpcError.message)
+    return { error: 'Something went wrong, please try again.' }
+  }
+  if (exists === true) {
+    return { error: 'Email already registered.' }
+  }
+
   const { data, error } = await supabase.auth.signUp({
-    email: formData.get('email') as string,
+    email,
     password: formData.get('password') as string,
     options: {
       data: {
@@ -63,20 +82,8 @@ export async function signUpUser(
   })
 
   if (error) {
-    // When confirmations are enabled, Supabase rate-limits re-registration
-    // of the same email with this message. Surface it as a duplicate-email
-    // error instead of a generic failure.
-    if (error.message?.includes('For security purposes')) {
-      return { error: 'Email already in use.' }
-    }
     console.error('[signUpUser] auth error', error.message)
     return { error: 'Failed to create account.' }
-  }
-
-  // Supabase silently succeeds for duplicate emails when confirmations are on,
-  // returning an empty identities array. Detect and surface this explicitly.
-  if (data.user?.identities?.length === 0) {
-    return { error: 'Email already in use.' }
   }
 
   // When email confirmation is enabled, the session is null until the user
