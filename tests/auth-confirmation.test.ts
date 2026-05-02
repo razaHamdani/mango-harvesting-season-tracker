@@ -16,6 +16,13 @@ vi.mock('@/lib/utils/client-ip', () => ({
   getClientIp: () => '127.0.0.1',
 }))
 
+// Keep EMAIL_RE real (format tests rely on it) but stub the DNS lookup so
+// @example.com addresses pass without a live MX query.
+vi.mock('@/lib/utils/email-validation', async (importOriginal) => {
+  const real = await importOriginal<typeof import('@/lib/utils/email-validation')>()
+  return { ...real, hasMxRecords: async () => true }
+})
+
 import { signUpUser, signInUser, resendConfirmation } from '@/lib/actions/auth-actions'
 import { setCurrentClient, clearCurrentClient } from './setup'
 

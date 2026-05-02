@@ -3,12 +3,10 @@
 import { createClient } from '@/lib/supabase/server'
 import { authLimiter, enforceLimit } from '@/lib/utils/rate-limiter'
 import { getClientIpFromHeaders } from '@/lib/utils/client-ip'
+import { EMAIL_RE, hasMxRecords } from '@/lib/utils/email-validation'
 
 const ALLOWED_ROLES = ['landlord'] as const
 type AllowedRole = typeof ALLOWED_ROLES[number]
-
-// RFC 5322-inspired check: local@domain.tld with no whitespace.
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 function isAllowedRole(role: unknown): role is AllowedRole {
   return ALLOWED_ROLES.includes(role as AllowedRole)
@@ -49,6 +47,11 @@ export async function signUpUser(
 
   const email = (formData.get('email') as string).trim()
   if (!EMAIL_RE.test(email)) {
+    return { error: 'Enter a valid email address.' }
+  }
+
+  const domain = email.split('@')[1]
+  if (!await hasMxRecords(domain)) {
     return { error: 'Enter a valid email address.' }
   }
 
