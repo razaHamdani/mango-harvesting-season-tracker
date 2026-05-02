@@ -80,6 +80,7 @@ export interface Database {
           fertilizer_landlord_pct: number;
           agreed_boxes: number;
           created_at: string;
+          started_at: string | null;
           closed_at: string | null;
         };
         Insert: {
@@ -95,6 +96,7 @@ export interface Database {
           fertilizer_landlord_pct?: number;
           agreed_boxes?: number;
           created_at?: string;
+          started_at?: string | null;
           closed_at?: string | null;
         };
         Update: {
@@ -110,6 +112,7 @@ export interface Database {
           fertilizer_landlord_pct?: number;
           agreed_boxes?: number;
           created_at?: string;
+          started_at?: string | null;
           closed_at?: string | null;
         };
         Relationships: [];

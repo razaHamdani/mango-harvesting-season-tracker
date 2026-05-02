@@ -235,6 +235,7 @@ describe('closeSeason — unpaid installment warning (5D.7)', () => {
         owner_id: user.id,
         year: 2026,
         status: 'active',
+        started_at: '2026-01-01',
         contractor_name: 'Contractor',
         predetermined_amount: 120_000,
         spray_landlord_pct: 50,
@@ -283,5 +284,80 @@ describe('closeSeason — unpaid installment warning (5D.7)', () => {
       .eq('id', seasonId)
       .single()
     expect(row?.status).toBe('closed')
+  })
+})
+
+/**
+ * Phase 10 — started_at is set on activation.
+ *
+ * Draft seasons have started_at = null. activateSeason populates it with
+ * today's date (UTC). The value persists through closeSeason.
+ */
+describe('activateSeason — started_at population (Phase 10)', () => {
+  const admin = createAdminClient()
+  let user: TestUser
+  let seasonId: string
+
+  beforeAll(async () => {
+    await resetDb(admin)
+    user = await createTestUser('season-started-at')
+
+    const { data: season } = await admin
+      .from('seasons')
+      .insert({
+        owner_id: user.id,
+        year: 2026,
+        status: 'draft',
+        contractor_name: 'Started-at Contractor',
+        predetermined_amount: 100_000,
+        spray_landlord_pct: 50,
+        fertilizer_landlord_pct: 50,
+        agreed_boxes: 0,
+      })
+      .select('id')
+      .single()
+    if (!season) throw new Error('season insert failed')
+    seasonId = season.id
+  })
+
+  afterAll(async () => {
+    clearCurrentClient()
+    if (user) await deleteTestUser(user.id)
+  })
+
+  it('starts as null on a draft, gets today on activation, and survives close', async () => {
+    // Draft → null
+    const { data: pre } = await admin
+      .from('seasons')
+      .select('started_at')
+      .eq('id', seasonId)
+      .single()
+    expect(pre?.started_at).toBeNull()
+
+    // Activate
+    setCurrentClient(user.client)
+    const today = new Date().toISOString().slice(0, 10)
+    const activateResult = await activateSeason(seasonId)
+    expect(activateResult).toMatchObject({ success: true })
+
+    const { data: active } = await admin
+      .from('seasons')
+      .select('started_at, status')
+      .eq('id', seasonId)
+      .single()
+    expect(active?.status).toBe('active')
+    expect(active?.started_at).toBe(today)
+
+    // Close → started_at retained
+    const closeResult = await closeSeason(seasonId)
+    expect(closeResult).toMatchObject({ success: true })
+
+    const { data: closed } = await admin
+      .from('seasons')
+      .select('started_at, status')
+      .eq('id', seasonId)
+      .single()
+    expect(closed?.status).toBe('closed')
+    expect(closed?.started_at).toBe(today)
   })
 })

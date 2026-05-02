@@ -2,7 +2,7 @@ import { beforeAll, afterAll, describe, expect, it } from 'vitest'
 import { createAdminClient, resetDb } from './helpers/admin'
 import { createTestUser, deleteTestUser, TestUser } from './helpers/user'
 import { setCurrentClient, clearCurrentClient } from './setup'
-import { deleteActivity } from '@/lib/actions/activity-actions'
+import { createActivity, deleteActivity } from '@/lib/actions/activity-actions'
 import { getActivities } from '@/lib/queries/activity-queries'
 
 /**
@@ -35,6 +35,7 @@ describe('deleteActivity — IDOR protection', () => {
         owner_id: userA.id,
         year: 2026,
         status: 'active',
+        started_at: '2026-01-01',
         contractor_name: 'A Contractor',
         predetermined_amount: 100_000,
         spray_landlord_pct: 50,
@@ -128,6 +129,7 @@ describe('getActivities — ownership guard', () => {
         owner_id: userA.id,
         year: 2026,
         status: 'active',
+        started_at: '2026-01-01',
         contractor_name: 'A Contractor',
         predetermined_amount: 100_000,
         spray_landlord_pct: 50,
@@ -192,6 +194,7 @@ describe('getActivities — linked expenses', () => {
         owner_id: user.id,
         year: 2026,
         status: 'active',
+        started_at: '2026-01-01',
         contractor_name: 'Linker',
         predetermined_amount: 50_000,
         spray_landlord_pct: 100,
@@ -257,5 +260,101 @@ describe('getActivities — linked expenses', () => {
 
     expect(found).toBeDefined()
     expect(found!.linked_expenses).toHaveLength(0)
+  })
+})
+
+/**
+ * Phase 10 — createActivity rejects activity_date before season start, and
+ * rejects any write against a draft (not-yet-active) season.
+ */
+describe('createActivity — season window guard (Phase 10)', () => {
+  const admin = createAdminClient()
+  let user: TestUser
+  let farmId: string
+  let activeSeasonId: string
+  let draftSeasonId: string
+
+  beforeAll(async () => {
+    await resetDb(admin)
+    user = await createTestUser('act-window')
+
+    const { data: farm } = await admin
+      .from('farms')
+      .insert({ owner_id: user.id, name: 'Window Farm', acreage: 4 })
+      .select('id').single()
+    if (!farm) throw new Error('farm seed failed')
+    farmId = farm.id
+
+    const { data: active } = await admin
+      .from('seasons')
+      .insert({
+        owner_id: user.id,
+        year: 2026,
+        status: 'active',
+        started_at: '2026-04-01',
+        contractor_name: 'Active C',
+        predetermined_amount: 50_000,
+        spray_landlord_pct: 50,
+        fertilizer_landlord_pct: 50,
+        agreed_boxes: 0,
+      })
+      .select('id').single()
+    if (!active) throw new Error('active season seed failed')
+    activeSeasonId = active.id
+    await admin.from('season_farms').insert({ season_id: activeSeasonId, farm_id: farmId })
+
+    const { data: draft } = await admin
+      .from('seasons')
+      .insert({
+        owner_id: user.id,
+        year: 2027,
+        status: 'draft',
+        contractor_name: 'Draft C',
+        predetermined_amount: 50_000,
+        spray_landlord_pct: 50,
+        fertilizer_landlord_pct: 50,
+        agreed_boxes: 0,
+      })
+      .select('id').single()
+    if (!draft) throw new Error('draft season seed failed')
+    draftSeasonId = draft.id
+    await admin.from('season_farms').insert({ season_id: draftSeasonId, farm_id: farmId })
+  })
+
+  afterAll(async () => {
+    clearCurrentClient()
+    if (user) await deleteTestUser(user.id)
+  })
+
+  function makeFormData(activityDate: string) {
+    const fd = new FormData()
+    fd.set('farm_id', farmId)
+    fd.set('type', 'spray')
+    fd.set('activity_date', activityDate)
+    fd.set('item_name', '')
+    fd.set('description', '')
+    return fd
+  }
+
+  it('rejects activity dated before season started_at', async () => {
+    setCurrentClient(user.client)
+    const result = await createActivity(makeFormData('2026-03-15'), activeSeasonId)
+    expect(result).toHaveProperty('error')
+    const err = (result as { error: Record<string, string[]> }).error
+    expect(err.activity_date?.[0]).toMatch(/on or after the season start/i)
+  })
+
+  it('rejects any activity against a draft season', async () => {
+    setCurrentClient(user.client)
+    const result = await createActivity(makeFormData('2026-05-01'), draftSeasonId)
+    expect(result).toHaveProperty('error')
+    const err = (result as { error: Record<string, string[]> }).error
+    expect(err.activity_date?.[0]).toMatch(/season is not active/i)
+  })
+
+  it('accepts activity dated on or after season started_at', async () => {
+    setCurrentClient(user.client)
+    const result = await createActivity(makeFormData('2026-05-01'), activeSeasonId)
+    expect(result).toMatchObject({ success: true })
   })
 })

@@ -32,6 +32,7 @@ describe('createExpense', () => {
         owner_id: user.id,
         year: 2026,
         status: 'active',
+        started_at: '2026-01-01',
         contractor_name: 'Ali',
         predetermined_amount: 200_000,
         spray_landlord_pct: 50,
@@ -158,6 +159,7 @@ describe('deleteExpense — IDOR protection', () => {
         owner_id: userA.id,
         year: 2026,
         status: 'active',
+        started_at: '2026-01-01',
         contractor_name: 'A Contractor',
         predetermined_amount: 100_000,
         spray_landlord_pct: 50,
@@ -253,6 +255,7 @@ describe('getExpenses — ownership guard', () => {
         owner_id: userA.id,
         year: 2026,
         status: 'active',
+        started_at: '2026-01-01',
         contractor_name: 'A Contractor',
         predetermined_amount: 100_000,
         spray_landlord_pct: 50,
@@ -326,6 +329,7 @@ describe('createExpense — foreign linked_activity_id (5D.3)', () => {
         owner_id: userA.id,
         year: 2026,
         status: 'active',
+        started_at: '2026-01-01',
         contractor_name: 'A',
         predetermined_amount: 100_000,
         spray_landlord_pct: 50,
@@ -352,6 +356,7 @@ describe('createExpense — foreign linked_activity_id (5D.3)', () => {
         owner_id: userB.id,
         year: 2026,
         status: 'active',
+        started_at: '2026-01-01',
         contractor_name: 'B',
         predetermined_amount: 100_000,
         spray_landlord_pct: 50,
@@ -423,6 +428,7 @@ describe('getExpenses — linked activity', () => {
         owner_id: user.id,
         year: 2026,
         status: 'active',
+        started_at: '2026-01-01',
         contractor_name: 'Linker',
         predetermined_amount: 50_000,
         spray_landlord_pct: 100,
@@ -493,5 +499,91 @@ describe('getExpenses — linked activity', () => {
 
     expect(found).toBeDefined()
     expect(found!.linked_activity).toBeNull()
+  })
+})
+
+/**
+ * Phase 10 — createExpense rejects expense_date before season start, and
+ * rejects any write against a draft season.
+ */
+describe('createExpense — season window guard (Phase 10)', () => {
+  const admin = createAdminClient()
+  let user: TestUser
+  let activeSeasonId: string
+  let draftSeasonId: string
+
+  beforeAll(async () => {
+    await resetDb(admin)
+    user = await createTestUser('exp-window')
+
+    const { data: active } = await admin
+      .from('seasons')
+      .insert({
+        owner_id: user.id,
+        year: 2026,
+        status: 'active',
+        started_at: '2026-04-01',
+        contractor_name: 'Active C',
+        predetermined_amount: 50_000,
+        spray_landlord_pct: 50,
+        fertilizer_landlord_pct: 50,
+        agreed_boxes: 0,
+      })
+      .select('id').single()
+    if (!active) throw new Error('active season seed failed')
+    activeSeasonId = active.id
+
+    const { data: draft } = await admin
+      .from('seasons')
+      .insert({
+        owner_id: user.id,
+        year: 2027,
+        status: 'draft',
+        contractor_name: 'Draft C',
+        predetermined_amount: 50_000,
+        spray_landlord_pct: 50,
+        fertilizer_landlord_pct: 50,
+        agreed_boxes: 0,
+      })
+      .select('id').single()
+    if (!draft) throw new Error('draft season seed failed')
+    draftSeasonId = draft.id
+  })
+
+  afterAll(async () => {
+    clearCurrentClient()
+    if (user) await deleteTestUser(user.id)
+  })
+
+  function makeFormData(expenseDate: string) {
+    const fd = new FormData()
+    fd.set('category', 'misc')
+    fd.set('amount', '500')
+    fd.set('expense_date', expenseDate)
+    fd.set('farm_id', '')
+    fd.set('description', 'guard test')
+    return fd
+  }
+
+  it('rejects expense dated before season started_at', async () => {
+    setCurrentClient(user.client)
+    const result = await createExpense(makeFormData('2026-03-15'), activeSeasonId)
+    expect(result).toHaveProperty('error')
+    const err = (result as { error: Record<string, string[]> }).error
+    expect(err.expense_date?.[0]).toMatch(/on or after the season start/i)
+  })
+
+  it('rejects any expense against a draft season', async () => {
+    setCurrentClient(user.client)
+    const result = await createExpense(makeFormData('2026-05-01'), draftSeasonId)
+    expect(result).toHaveProperty('error')
+    const err = (result as { error: Record<string, string[]> }).error
+    expect(err.expense_date?.[0]).toMatch(/season is not active/i)
+  })
+
+  it('accepts expense dated on or after season started_at', async () => {
+    setCurrentClient(user.client)
+    const result = await createExpense(makeFormData('2026-05-01'), activeSeasonId)
+    expect(result).toMatchObject({ success: true })
   })
 })

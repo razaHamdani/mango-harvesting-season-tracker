@@ -194,9 +194,12 @@ export async function activateSeason(id: string) {
 
   // The partial unique index 'one_active_season_per_owner' enforces the
   // one-active-at-a-time rule atomically. No pre-check needed.
+  // started_at = today's date (UTC ISO, then sliced to YYYY-MM-DD) is the
+  // business start of the season — used to reject pre-dated child records.
+  const startedAt = new Date().toISOString().slice(0, 10)
   const { error } = await supabase
     .from('seasons')
-    .update({ status: 'active' })
+    .update({ status: 'active', started_at: startedAt })
     .eq('id', id)
     .eq('owner_id', user.id)
 

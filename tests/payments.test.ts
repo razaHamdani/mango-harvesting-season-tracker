@@ -30,6 +30,7 @@ describe('recordPayment — RC-2 TOCTOU', () => {
         owner_id: user.id,
         year: 2026,
         status: 'active',
+        started_at: '2026-01-01',
         contractor_name: 'Test Contractor',
         predetermined_amount: 100_000,
         spray_landlord_pct: 100,
@@ -154,6 +155,7 @@ describe('recordPayment — ownership guard', () => {
         owner_id: userA.id,
         year: 2026,
         status: 'active',
+        started_at: '2026-01-01',
         contractor_name: 'A Contractor',
         predetermined_amount: 100_000,
         spray_landlord_pct: 100,
@@ -209,5 +211,110 @@ describe('recordPayment — ownership guard', () => {
       .single()
     expect(row).not.toBeNull()
     expect(row!.paid_amount).toBeNull()
+  })
+})
+
+/**
+ * Phase 10 — recordPayment rejects paid_date before season started_at, and
+ * rejects payments against a draft season.
+ */
+describe('recordPayment — season window guard (Phase 10)', () => {
+  const admin = createAdminClient()
+  let user: TestUser
+  let activeSeasonId: string
+  let activeInstallmentId: string
+  let draftSeasonId: string
+  let draftInstallmentId: string
+
+  beforeAll(async () => {
+    await resetDb(admin)
+    user = await createTestUser('pay-window')
+
+    const { data: active } = await admin
+      .from('seasons')
+      .insert({
+        owner_id: user.id,
+        year: 2026,
+        status: 'active',
+        started_at: '2026-04-01',
+        contractor_name: 'Active C',
+        predetermined_amount: 50_000,
+        spray_landlord_pct: 100,
+        fertilizer_landlord_pct: 100,
+        agreed_boxes: 0,
+      })
+      .select('id').single()
+    if (!active) throw new Error('active season seed failed')
+    activeSeasonId = active.id
+    const { data: activeInst } = await admin
+      .from('installments')
+      .insert({
+        season_id: activeSeasonId,
+        installment_number: 1,
+        expected_amount: 50_000,
+        due_date: '2026-06-01',
+      })
+      .select('id').single()
+    if (!activeInst) throw new Error('active installment seed failed')
+    activeInstallmentId = activeInst.id
+
+    const { data: draft } = await admin
+      .from('seasons')
+      .insert({
+        owner_id: user.id,
+        year: 2027,
+        status: 'draft',
+        contractor_name: 'Draft C',
+        predetermined_amount: 50_000,
+        spray_landlord_pct: 100,
+        fertilizer_landlord_pct: 100,
+        agreed_boxes: 0,
+      })
+      .select('id').single()
+    if (!draft) throw new Error('draft season seed failed')
+    draftSeasonId = draft.id
+    const { data: draftInst } = await admin
+      .from('installments')
+      .insert({
+        season_id: draftSeasonId,
+        installment_number: 1,
+        expected_amount: 50_000,
+        due_date: '2027-06-01',
+      })
+      .select('id').single()
+    if (!draftInst) throw new Error('draft installment seed failed')
+    draftInstallmentId = draftInst.id
+  })
+
+  afterAll(async () => {
+    clearCurrentClient()
+    if (user) await deleteTestUser(user.id)
+  })
+
+  function makeFormData(paidDate: string) {
+    const fd = new FormData()
+    fd.set('amount', '50000')
+    fd.set('paid_date', paidDate)
+    return fd
+  }
+
+  it('rejects payment dated before season started_at', async () => {
+    setCurrentClient(user.client)
+    const result = await recordPayment(activeInstallmentId, makeFormData('2026-03-15'), activeSeasonId)
+    expect(result).toHaveProperty('error')
+    expect((result as { error: string }).error).toMatch(/on or after the season start/i)
+  })
+
+  it('rejects any payment against a draft season', async () => {
+    setCurrentClient(user.client)
+    const result = await recordPayment(draftInstallmentId, makeFormData('2027-04-01'), draftSeasonId)
+    expect(result).toHaveProperty('error')
+    expect((result as { error: string }).error).toMatch(/season is not active/i)
+  })
+
+  it('accepts payment dated on or after season started_at', async () => {
+    setCurrentClient(user.client)
+    const result = await recordPayment(activeInstallmentId, makeFormData('2026-05-15'), activeSeasonId)
+    expect(result).toMatchObject({ success: true })
   })
 })

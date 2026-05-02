@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { validatePhotoPath } from '@/lib/utils/validate-photo-path'
 import { mutationLimiter, enforceLimit } from '@/lib/utils/rate-limiter'
+import { assertWithinSeasonWindow } from '@/lib/utils/season-date-guard'
 
 export async function recordPayment(
   installmentId: string,
@@ -43,6 +44,11 @@ export async function recordPayment(
   const paidDate = formData.get('paid_date') as string
   if (!paidDate) {
     return { error: 'Payment date is required.' }
+  }
+
+  const guard = await assertWithinSeasonWindow(supabase, seasonId, paidDate)
+  if (!guard.ok) {
+    return { error: guard.error }
   }
 
   const notes = (formData.get('notes') as string) || null

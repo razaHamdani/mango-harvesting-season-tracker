@@ -2,13 +2,15 @@
 
 ## Currently Working On
 
-Nothing — Phase 9.5 complete.
+Nothing — Phase 10 complete.
 
 ## Completed
 
 - [x] Phase 9A: Duplicate-email signup error — `signUpUser` now detects empty `identities` array (silent Supabase behavior) and "For security purposes" rate-limit error, returning `'Email already in use.'`; test added to `auth-confirmation.test.ts`
 - [x] Phase 9B: Email confirmation redirect — proxy forwards `token_hash` query param to `/auth/callback` instead of stripping it on redirect to `/login` (`proxy.ts`)
 - [x] Phase 9C: Linked expenses on activity rows — `ActivityWithFarm` extended with `linked_expenses[]`; `getActivities` batch-fetches linked expenses after page query; `ActivityList` adds Expenses column with deep-link navigation to `/seasons/{id}/expenses#expense-{id}`; expense `TableRow`s get `id` attributes; 2 new tests in `activities.test.ts`
+- [x] Phase 10A: `started_at DATE` on seasons — new migration `20260502120000_seasons_started_at.sql` adds the column + CHECK `(status = 'draft' OR started_at IS NOT NULL)`. `activateSeason` sets `started_at = today` (UTC ISO date) alongside `status = 'active'`. `seasons` Row/Insert/Update in `database.ts` extended. New `seasons.test.ts` block asserts null on draft → today on activate → preserved through close.
+- [x] Phase 10B: Season window guard — new helper `src/lib/utils/season-date-guard.ts` (`assertWithinSeasonWindow`) wired into `createActivity` (field-keyed `activity_date` error), `createExpense` (field-keyed `expense_date` error), and `recordPayment` (string error). Rejects child records dated before `started_at` AND blocks any write to a non-active season. New "season window guard (Phase 10)" describes in `activities.test.ts`, `expenses.test.ts`, `payments.test.ts` cover before-start rejection, draft-season rejection, and on/after acceptance. All existing test fixtures patched with `started_at: '2026-01-01'` to satisfy the CHECK. 108 tests passing, tsc clean.
 - [x] Phase 9.5A: Duplicate email pre-check — `email_exists` SECURITY DEFINER RPC queries `auth.users`; `signUpUser` calls it before `signUp`, fails-closed on RPC error ("Something went wrong, please try again"), returns "Email already registered." on hit; fallbacks A/B removed; email format validated via regex before RPC; migration `20260430120000_email_exists_rpc.sql`; test updated + new format-validation test; 86 tests passing
 - [x] Phase 9.5B: Photo thumbnails in list rows — `PhotoThumbnailClient` (client component) fetches 300s signed URL in a `useEffect` and renders via `PhotoThumbnailLightbox`; wired into `activity-list.tsx` and `expense-list.tsx` (replaces static CameraIcon)
 - [x] Phase 9.5C: Custom email confirmation template — `supabase/templates/confirmation.html` hard-codes `/auth/callback?token_hash={{ .TokenHash }}&type=email&next=/dashboard`; wired in `config.toml`; bypasses Supabase's PKCE `/verify` endpoint entirely; Supabase restarted to apply
@@ -86,6 +88,12 @@ Nothing — Phase 9.5 complete.
 - 2026-04-28: Phase 7 — Sentry `requestId` moved to `beforeSend` (server+edge configs) reading `x-request-id` header, avoiding global hub mutation that bleeds across concurrent requests.
 - 2026-04-28: Phase 7 — CI `.env.test` heredoc had leading whitespace from shell indentation; fixed by aligning EOF content at column 0 inside the `run:` block.
 - 2026-04-28: B1 implementation — chose to hook `attachRequestContext()` inside `createClient` rather than touch all 22 Server Actions individually. Single-touchpoint approach: every action calls `createClient` near the top, and tests mock the entire `@/lib/supabase/server` module so test isolation is preserved. Rejected the wrapper-per-action approach as too invasive for the win.
+- 2026-05-02: Phase 10 — `started_at` is DATE (not TIMESTAMPTZ): comparison columns (`activity_date`, `expense_date`, `paid_date`) are all DATE; mixing types means casting on every comparison. `closed_at` stays TIMESTAMPTZ for audit precision; `started_at` is a business boundary so DATE fits.
+- 2026-05-02: Phase 10 — enforcement is app-level only (no DB trigger). Every write to activities/expenses/installments goes through a server action; the helper centralises the check. CHECK constraint on `seasons` is the only DB-level guarantee.
+- 2026-05-02: Phase 10 — no backfill in the migration. The user wiped existing season data before applying. If legacy active/closed rows had remained, the CHECK would reject them at apply time.
+- 2026-05-02: Phase 10 — installment `due_date` is intentionally NOT validated against `started_at`. Installments are created at season creation (pre-activation), so a `due_date` may legitimately predate the start. Only `paid_date` is enforced (when recording a payment).
+- 2026-05-02: Phase 10 — draft-season writes blocked entirely. `assertWithinSeasonWindow` returns "Season is not active" for any non-active status. Rationale: no `started_at` means no window to validate against; activities/expenses/payments only make sense once the season is live.
+- 2026-05-02: Phase 10 — originally proposed dashboard "End Season" button was dropped. The existing `SeasonActionButtons` on `/seasons/{id}` stays as the single entry point for closing.
 - 2026-05-01: Phase 9.5A — `email_exists` RPC is an intentional enumeration vector; user explicitly accepted this trade-off (friendlier UX over enumeration resistance).
 - 2026-05-01: Phase 9.5A — removed fallback A ("For security purposes" string match) and fallback B (`identities.length === 0`); RPC pre-check is now the single authoritative duplicate-email gate. If the RPC itself errors, fail-closed and do not proceed to `signUp`.
 - 2026-04-28: B1 keeps `beforeSend` hook in sentry.{server,edge}.config.ts as defense-in-depth — if `next/headers` ever exposes the value via `event.request.headers`, the tag still attaches; otherwise the per-async-context scope path is authoritative.

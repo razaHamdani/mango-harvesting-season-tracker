@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { activitySchema } from '@/lib/utils/validators'
 import { validatePhotoPath } from '@/lib/utils/validate-photo-path'
 import { mutationLimiter, enforceLimit } from '@/lib/utils/rate-limiter'
+import { assertWithinSeasonWindow } from '@/lib/utils/season-date-guard'
 
 export async function createActivity(formData: FormData, seasonId: string) {
   const parsed = activitySchema.safeParse({
@@ -48,6 +49,11 @@ export async function createActivity(formData: FormData, seasonId: string) {
 
   if (!ownedSeason) {
     return { error: 'Season not found.' }
+  }
+
+  const guard = await assertWithinSeasonWindow(supabase, seasonId, parsed.data.activity_date)
+  if (!guard.ok) {
+    return { error: { activity_date: [guard.error] } }
   }
 
   // Photo (if any) was already uploaded client-side; persist the path only
