@@ -8,6 +8,7 @@ import { validatePhotoPath } from '@/lib/utils/validate-photo-path'
 import { mutationLimiter, enforceLimit } from '@/lib/utils/rate-limiter'
 import { assertWithinSeasonWindow } from '@/lib/utils/season-date-guard'
 import { assertFarmInSeason } from '@/lib/utils/farm-season-guard'
+import { assertWorkerOwned } from '@/lib/utils/worker-guard'
 
 export async function createExpense(formData: FormData, seasonId: string) {
   const parsed = expenseSchema.safeParse({
@@ -17,6 +18,7 @@ export async function createExpense(formData: FormData, seasonId: string) {
     farm_id: formData.get('farm_id'),
     description: formData.get('description'),
     linked_activity_id: formData.get('linked_activity_id') ?? undefined,
+    worker_id: formData.get('worker_id') ?? undefined,
   })
 
   if (!parsed.success) {
@@ -53,7 +55,18 @@ export async function createExpense(formData: FormData, seasonId: string) {
     return { error: { expense_date: [guard.error] } }
   }
 
-  if (parsed.data.farm_id) {
+  // Resolve worker_id from parsed data (undefined/null if not a salary expense)
+  const workerId = parsed.data.worker_id || null
+
+  // When worker_id is supplied, verify ownership and force farm_id to null
+  // (salaries are season-wide, not farm-specific)
+  if (workerId) {
+    const workerGuard = await assertWorkerOwned(supabase, workerId, user.id)
+    if (!workerGuard.ok) {
+      return { error: { worker_id: [workerGuard.error] } }
+    }
+  } else if (parsed.data.farm_id) {
+    // Only run farm guard when no worker is attached (normal expense flow)
     const farmGuard = await assertFarmInSeason(supabase, seasonId, parsed.data.farm_id)
     if (!farmGuard.ok) {
       return { error: { farm_id: [farmGuard.error] } }
@@ -90,7 +103,7 @@ export async function createExpense(formData: FormData, seasonId: string) {
     .from('expenses')
     .insert({
       season_id: seasonId,
-      farm_id: parsed.data.farm_id || null,
+      farm_id: workerId ? null : parsed.data.farm_id || null,
       category: parsed.data.category,
       amount: parsed.data.amount,
       landlord_cost: landlordCost,
@@ -98,6 +111,7 @@ export async function createExpense(formData: FormData, seasonId: string) {
       description: parsed.data.description || null,
       linked_activity_id: parsed.data.linked_activity_id || null,
       photo_path: photoPath,
+      worker_id: workerId,
     })
     .select('id')
     .single()
