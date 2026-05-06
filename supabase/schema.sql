@@ -87,6 +87,7 @@ CREATE TABLE public.expenses (
   description        TEXT,
   photo_path         TEXT,
   linked_activity_id UUID REFERENCES public.activities(id) ON DELETE SET NULL,
+  worker_id          UUID,
   created_at         TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -99,6 +100,17 @@ CREATE TABLE public.workers (
   is_active      BOOLEAN DEFAULT TRUE,
   created_at     TIMESTAMPTZ DEFAULT NOW()
 );
+
+ALTER TABLE public.expenses
+  ADD CONSTRAINT expenses_worker_id_fk
+  FOREIGN KEY (worker_id) REFERENCES public.workers(id) ON DELETE SET NULL;
+
+ALTER TABLE public.expenses
+  ADD CONSTRAINT expenses_worker_only_for_labor
+  CHECK (worker_id IS NULL OR category = 'labor');
+
+CREATE INDEX idx_expenses_worker_id
+  ON public.expenses(worker_id) WHERE worker_id IS NOT NULL;
 
 -- ============================================================
 -- INDEXES
