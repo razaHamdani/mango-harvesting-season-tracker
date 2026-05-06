@@ -11,13 +11,17 @@ export async function assertFarmInSeason(
   seasonId: string,
   farmId: string,
 ): Promise<FarmGuard> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('season_farms')
     .select('id')
     .eq('season_id', seasonId)
     .eq('farm_id', farmId)
     .maybeSingle()
 
+  if (error) {
+    console.error('[assertFarmInSeason] query failed', error)
+    return { ok: false, error: 'Could not verify farm enrollment. Please try again.' }
+  }
   if (!data) return { ok: false, error: 'Selected farm is not part of this season.' }
   return { ok: true }
 }
