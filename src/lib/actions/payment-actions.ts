@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { validatePhotoPath } from '@/lib/utils/validate-photo-path'
 import { mutationLimiter, enforceLimit } from '@/lib/utils/rate-limiter'
 import { assertWithinSeasonWindow } from '@/lib/utils/season-date-guard'
+import { paymentSchema } from '@/lib/utils/validators'
 
 export async function recordPayment(
   installmentId: string,
@@ -34,24 +35,21 @@ export async function recordPayment(
   if (!ownedSeason) return { error: 'Season not found.' }
 
   // Extract and validate form fields
-  const amountStr = formData.get('amount') as string
-  const amount = parseFloat(amountStr)
-
-  if (!amountStr || isNaN(amount) || amount <= 0) {
-    return { error: 'Amount must be greater than 0.' }
+  const parsed = paymentSchema.safeParse({
+    amount: formData.get('amount'),
+    paid_date: formData.get('paid_date'),
+    notes: formData.get('notes') ?? undefined,
+  })
+  if (!parsed.success) {
+    return { error: parsed.error.flatten().fieldErrors }
   }
-
-  const paidDate = formData.get('paid_date') as string
-  if (!paidDate) {
-    return { error: 'Payment date is required.' }
-  }
+  const { amount, paid_date: paidDate, notes: rawNotes } = parsed.data
+  const notes = rawNotes || null
 
   const guard = await assertWithinSeasonWindow(supabase, seasonId, paidDate)
   if (!guard.ok) {
     return { error: guard.error }
   }
-
-  const notes = (formData.get('notes') as string) || null
 
   // Photo (if any) was already uploaded client-side; persist the path only
   // if it passes strict format + ownership validation.

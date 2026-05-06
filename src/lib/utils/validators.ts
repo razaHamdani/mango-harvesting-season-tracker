@@ -47,3 +47,12 @@ export const seasonCreateSchema = z.object({
   farm_ids: z.array(z.string().uuid()).min(1, 'Select at least one farm'),
   installments: z.array(installmentSchema).min(1, 'At least one installment is required'),
 })
+
+export const paymentSchema = z.object({
+  amount: z.coerce
+    .number()
+    .refine((n) => Number.isFinite(n), { message: 'Amount must be a valid number.' })
+    .refine((n) => n > 0, { message: 'Amount must be greater than 0.' }),
+  paid_date: z.string().min(1, 'Payment date is required.'),
+  notes: z.string().optional().or(z.literal('')),
+})

@@ -318,3 +318,103 @@ describe('recordPayment — season window guard (Phase 10)', () => {
     expect(result).toMatchObject({ success: true })
   })
 })
+
+describe('recordPayment — amount validation (Phase 11C)', () => {
+  const admin = createAdminClient()
+  let user: TestUser
+  let seasonId: string
+  let installmentId: string
+
+  beforeEach(async () => {
+    await resetDb(admin)
+    if (user) await deleteTestUser(user.id)
+    user = await createTestUser('pay-validation')
+    setCurrentClient(user.client)
+
+    const { data: farm } = await user.client
+      .from('farms')
+      .insert({ owner_id: user.id, name: 'Val Farm', acreage: 10 })
+      .select('id')
+      .single()
+    if (!farm) throw new Error('farm insert failed')
+
+    const { data: season } = await user.client
+      .from('seasons')
+      .insert({
+        owner_id: user.id,
+        year: 2026,
+        status: 'active',
+        started_at: '2026-01-01',
+        contractor_name: 'Val Contractor',
+        predetermined_amount: 100_000,
+        spray_landlord_pct: 100,
+        fertilizer_landlord_pct: 100,
+        agreed_boxes: 0,
+      })
+      .select('id')
+      .single()
+    if (!season) throw new Error('season insert failed')
+    seasonId = season.id
+
+    await user.client
+      .from('season_farms')
+      .insert({ season_id: seasonId, farm_id: farm.id })
+
+    const { data: inst } = await user.client
+      .from('installments')
+      .insert({
+        season_id: seasonId,
+        installment_number: 1,
+        expected_amount: 100_000,
+        due_date: '2026-06-01',
+      })
+      .select('id')
+      .single()
+    if (!inst) throw new Error('installment insert failed')
+    installmentId = inst.id
+  })
+
+  afterAll(async () => {
+    clearCurrentClient()
+    if (user) await deleteTestUser(user.id)
+  })
+
+  function makeFormData(amount: string, paidDate = '2026-05-20') {
+    const fd = new FormData()
+    fd.set('amount', amount)
+    fd.set('paid_date', paidDate)
+    return fd
+  }
+
+  it('rejects "100abc" amount', async () => {
+    const result = await recordPayment(installmentId, makeFormData('100abc'), seasonId)
+    expect(result).toHaveProperty('error')
+    const err = (result as { error: unknown }).error
+    if (typeof err === 'string') {
+      expect(err).toMatch(/number|valid/i)
+    } else {
+      expect((err as Record<string, unknown>).amount).toBeDefined()
+    }
+  })
+
+  it('rejects negative amount', async () => {
+    const result = await recordPayment(installmentId, makeFormData('-5'), seasonId)
+    expect(result).toHaveProperty('error')
+    const err = (result as { error: unknown }).error
+    expect(err).toBeTruthy()
+  })
+
+  it('rejects empty amount', async () => {
+    const result = await recordPayment(installmentId, makeFormData(''), seasonId)
+    expect(result).toHaveProperty('error')
+    const err = (result as { error: unknown }).error
+    expect(err).toBeTruthy()
+  })
+
+  it('rejects zero amount', async () => {
+    const result = await recordPayment(installmentId, makeFormData('0'), seasonId)
+    expect(result).toHaveProperty('error')
+    const err = (result as { error: unknown }).error
+    expect(err).toBeTruthy()
+  })
+})
