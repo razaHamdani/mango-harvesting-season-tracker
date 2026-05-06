@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 // Undo the global mock from setup.ts so we test the real enforceLimit logic.
 vi.unmock('@/lib/utils/rate-limiter')
@@ -54,5 +54,35 @@ describe('enforceLimit', () => {
   it('always allows when limiter is null even with failOpen=false', async () => {
     const { allowed } = await enforceLimit(null, 'ip:1.2.3.4', false)
     expect(allowed).toBe(true)
+  })
+})
+
+describe('production startup guard', () => {
+  afterEach(() => {
+    vi.resetModules()
+  })
+
+  it('throws when NODE_ENV=production and env vars missing', async () => {
+    const originalEnv = process.env.NODE_ENV
+    const originalUrl = process.env.UPSTASH_REDIS_REST_URL
+    const originalToken = process.env.UPSTASH_REDIS_REST_TOKEN
+
+    // @ts-expect-error: NODE_ENV is readonly in types but writable at runtime
+    process.env.NODE_ENV = 'production'
+    delete process.env.UPSTASH_REDIS_REST_URL
+    delete process.env.UPSTASH_REDIS_REST_TOKEN
+
+    try {
+      // Re-import the module fresh so createLimiters() re-runs
+      vi.resetModules()
+      await expect(import('@/lib/utils/rate-limiter')).rejects.toThrow(
+        /UPSTASH_REDIS_REST_URL.*required in production/
+      )
+    } finally {
+      // @ts-expect-error
+      process.env.NODE_ENV = originalEnv
+      if (originalUrl !== undefined) process.env.UPSTASH_REDIS_REST_URL = originalUrl
+      if (originalToken !== undefined) process.env.UPSTASH_REDIS_REST_TOKEN = originalToken
+    }
   })
 })

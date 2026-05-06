@@ -32,6 +32,12 @@ function createLimiters(): {
   const token = process.env.UPSTASH_REDIS_REST_TOKEN
 
   if (!url || !token) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(
+        '[rate-limit] UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are required in production. ' +
+        'Rate limiting is disabled — refusing to start.'
+      )
+    }
     if (process.env.NODE_ENV !== 'test') {
       console.warn(
         '[rate-limit] UPSTASH_REDIS_REST_URL/TOKEN not set — ' +
