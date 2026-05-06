@@ -159,17 +159,38 @@ CREATE POLICY "Users can manage own installments"
   USING (season_id IN (SELECT id FROM public.seasons WHERE owner_id = auth.uid()))
   WITH CHECK (season_id IN (SELECT id FROM public.seasons WHERE owner_id = auth.uid()));
 
--- activities: access via season ownership
+-- activities: access via season ownership; write also requires farm_id ∈ season_farms
 CREATE POLICY "Users can manage own activities"
   ON public.activities FOR ALL
-  USING (season_id IN (SELECT id FROM public.seasons WHERE owner_id = auth.uid()))
-  WITH CHECK (season_id IN (SELECT id FROM public.seasons WHERE owner_id = auth.uid()));
+  USING (
+    season_id IN (SELECT id FROM public.seasons WHERE owner_id = auth.uid())
+  )
+  WITH CHECK (
+    season_id IN (SELECT id FROM public.seasons WHERE owner_id = auth.uid())
+    AND EXISTS (
+      SELECT 1 FROM public.season_farms sf
+      WHERE sf.season_id = activities.season_id
+        AND sf.farm_id   = activities.farm_id
+    )
+  );
 
--- expenses: access via season ownership
+-- expenses: access via season ownership; write also requires farm_id ∈ season_farms (when non-null)
 CREATE POLICY "Users can manage own expenses"
   ON public.expenses FOR ALL
-  USING (season_id IN (SELECT id FROM public.seasons WHERE owner_id = auth.uid()))
-  WITH CHECK (season_id IN (SELECT id FROM public.seasons WHERE owner_id = auth.uid()));
+  USING (
+    season_id IN (SELECT id FROM public.seasons WHERE owner_id = auth.uid())
+  )
+  WITH CHECK (
+    season_id IN (SELECT id FROM public.seasons WHERE owner_id = auth.uid())
+    AND (
+      farm_id IS NULL
+      OR EXISTS (
+        SELECT 1 FROM public.season_farms sf
+        WHERE sf.season_id = expenses.season_id
+          AND sf.farm_id   = expenses.farm_id
+      )
+    )
+  );
 
 -- ============================================================
 -- AUTH TRIGGER: auto-create profile on signup
