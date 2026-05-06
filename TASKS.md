@@ -2,9 +2,15 @@
 
 ## Currently Working On
 
-Nothing — Phase 10 complete.
+Nothing — Phase 11 complete.
 
 ## Completed
+
+- [x] Phase 11A: DB-layer integrity — new migration `20260504120000_farm_season_membership.sql` tightens `activities` and `expenses` RLS WITH CHECK clauses to require `farm_id ∈ season_farms` for the same season; wrapped in transaction with IF EXISTS guards and rollback comment; `schema.sql` updated to match
+- [x] Phase 11B: App-layer farm guard — new `src/lib/utils/farm-season-guard.ts` (`assertFarmInSeason`); wired into `createActivity` (required, field-keyed error) and `createExpense` (optional, only when farm_id non-empty); DB errors propagated; 4 new tests in activities/expenses test files; 112 tests passing
+- [x] Phase 11C: Hardened payment input — `paymentSchema` added to `validators.ts` with `z.coerce.number()` + finite+positive refines; `payment-actions.ts` replaces `parseFloat` block with Zod parse, returns flattened string error for UI compatibility; 4 new amount-validation tests; 116 tests passing
+- [x] Phase 11D: Rate-limit startup guard — `rate-limiter.ts` throws at module load in production when `UPSTASH_REDIS_REST_URL`/`TOKEN` missing; dev/test unchanged; 1 new test using `vi.resetModules()` + dynamic import; 117 tests passing
+- [x] Phase 11E: Multi-platform client-IP — `client-ip.ts` rewritten with shared `extractIp` helper; priority chain: `cf-connecting-ip` → `x-real-ip` → leftmost XFF (gated on `TRUSTED_XFF=leftmost`) → `'unknown'`; rightmost XFF removed; platform docstring added
 
 - [x] Phase 9A: Duplicate-email signup error — `signUpUser` now detects empty `identities` array (silent Supabase behavior) and "For security purposes" rate-limit error, returning `'Email already in use.'`; test added to `auth-confirmation.test.ts`
 - [x] Phase 9B: Email confirmation redirect — proxy forwards `token_hash` query param to `/auth/callback` instead of stripping it on redirect to `/login` (`proxy.ts`)
