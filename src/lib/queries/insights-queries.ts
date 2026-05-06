@@ -8,6 +8,7 @@ type RawInsights = {
   boxes_received: number
   total_expenses: number
   expenses_by_category: Record<string, number>
+  worker_salaries: number
   total_payments_received: number
   installments_paid: number
   installments_total: number
@@ -21,6 +22,8 @@ export type SeasonInsightsView = {
   boxesReceived: number
   totalExpenses: number
   expensesByCategory: Record<string, number>
+  workerSalaries: number
+  workerSalariesPerAcre: number
   totalPaymentsReceived: number
   installmentsPaid: number
   installmentsTotal: number
@@ -48,6 +51,8 @@ function deriveMetrics(
     boxesReceived: raw.boxes_received,
     totalExpenses: raw.total_expenses,
     expensesByCategory: byCat,
+    workerSalaries: raw.worker_salaries ?? 0,
+    workerSalariesPerAcre: safe(raw.worker_salaries ?? 0),
     totalPaymentsReceived: raw.total_payments_received,
     installmentsPaid: raw.installments_paid,
     installmentsTotal: raw.installments_total,
