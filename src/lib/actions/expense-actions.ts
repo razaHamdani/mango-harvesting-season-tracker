@@ -7,6 +7,7 @@ import { calculateLandlordCost } from '@/lib/utils/duty-split'
 import { validatePhotoPath } from '@/lib/utils/validate-photo-path'
 import { mutationLimiter, enforceLimit } from '@/lib/utils/rate-limiter'
 import { assertWithinSeasonWindow } from '@/lib/utils/season-date-guard'
+import { assertFarmInSeason } from '@/lib/utils/farm-season-guard'
 
 export async function createExpense(formData: FormData, seasonId: string) {
   const parsed = expenseSchema.safeParse({
@@ -50,6 +51,13 @@ export async function createExpense(formData: FormData, seasonId: string) {
   const guard = await assertWithinSeasonWindow(supabase, seasonId, parsed.data.expense_date)
   if (!guard.ok) {
     return { error: { expense_date: [guard.error] } }
+  }
+
+  if (parsed.data.farm_id) {
+    const farmGuard = await assertFarmInSeason(supabase, seasonId, parsed.data.farm_id)
+    if (!farmGuard.ok) {
+      return { error: { farm_id: [farmGuard.error] } }
+    }
   }
 
   const landlordCost = calculateLandlordCost(

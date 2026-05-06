@@ -358,3 +358,84 @@ describe('createActivity — season window guard (Phase 10)', () => {
     expect(result).toMatchObject({ success: true })
   })
 })
+
+/**
+ * Phase 11B — createActivity rejects a farm_id that is not enrolled in the season.
+ */
+describe('createActivity — farm membership guard (Phase 11B)', () => {
+  const admin = createAdminClient()
+  let user: TestUser
+  let seasonId: string
+  let enrolledFarmId: string
+  let unenrolledFarmId: string
+
+  beforeAll(async () => {
+    await resetDb(admin)
+    user = await createTestUser('act-farm-guard')
+
+    // Farm enrolled in the season
+    const { data: enrolledFarm } = await admin
+      .from('farms')
+      .insert({ owner_id: user.id, name: 'Enrolled Farm', acreage: 3 })
+      .select('id').single()
+    if (!enrolledFarm) throw new Error('enrolledFarm seed failed')
+    enrolledFarmId = enrolledFarm.id
+
+    // Farm owned by user but NOT enrolled
+    const { data: unenrolledFarm } = await admin
+      .from('farms')
+      .insert({ owner_id: user.id, name: 'Unenrolled Farm', acreage: 2 })
+      .select('id').single()
+    if (!unenrolledFarm) throw new Error('unenrolledFarm seed failed')
+    unenrolledFarmId = unenrolledFarm.id
+
+    const { data: season } = await admin
+      .from('seasons')
+      .insert({
+        owner_id: user.id,
+        year: 2026,
+        status: 'active',
+        started_at: '2026-01-01',
+        contractor_name: 'Guard C',
+        predetermined_amount: 50_000,
+        spray_landlord_pct: 50,
+        fertilizer_landlord_pct: 50,
+        agreed_boxes: 0,
+      })
+      .select('id').single()
+    if (!season) throw new Error('season seed failed')
+    seasonId = season.id
+
+    // Only enroll the first farm
+    await admin.from('season_farms').insert({ season_id: seasonId, farm_id: enrolledFarmId })
+  })
+
+  afterAll(async () => {
+    clearCurrentClient()
+    if (user) await deleteTestUser(user.id)
+  })
+
+  function makeFormData(farmId: string) {
+    const fd = new FormData()
+    fd.set('farm_id', farmId)
+    fd.set('type', 'spray')
+    fd.set('activity_date', '2026-05-01')
+    fd.set('item_name', '')
+    fd.set('description', '')
+    return fd
+  }
+
+  it('rejects activity when farm_id is not enrolled in the season', async () => {
+    setCurrentClient(user.client)
+    const result = await createActivity(makeFormData(unenrolledFarmId), seasonId)
+    expect(result).toHaveProperty('error')
+    const err = (result as { error: Record<string, string[]> }).error
+    expect(err.farm_id?.[0]).toMatch(/not part of this season/i)
+  })
+
+  it('accepts activity when farm_id is enrolled in the season', async () => {
+    setCurrentClient(user.client)
+    const result = await createActivity(makeFormData(enrolledFarmId), seasonId)
+    expect(result).toMatchObject({ success: true })
+  })
+})

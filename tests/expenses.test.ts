@@ -587,3 +587,89 @@ describe('createExpense — season window guard (Phase 10)', () => {
     expect(result).toMatchObject({ success: true })
   })
 })
+
+/**
+ * Phase 11B — createExpense rejects a farm_id that is not enrolled in the season,
+ * but allows omitting farm_id entirely (it's optional).
+ */
+describe('createExpense — farm membership guard (Phase 11B)', () => {
+  const admin = createAdminClient()
+  let user: TestUser
+  let seasonId: string
+  let enrolledFarmId: string
+  let unenrolledFarmId: string
+
+  beforeAll(async () => {
+    await resetDb(admin)
+    user = await createTestUser('exp-farm-guard')
+
+    // Farm enrolled in the season
+    const { data: enrolledFarm } = await admin
+      .from('farms')
+      .insert({ owner_id: user.id, name: 'Enrolled Farm', acreage: 3 })
+      .select('id').single()
+    if (!enrolledFarm) throw new Error('enrolledFarm seed failed')
+    enrolledFarmId = enrolledFarm.id
+
+    // Farm owned by user but NOT enrolled
+    const { data: unenrolledFarm } = await admin
+      .from('farms')
+      .insert({ owner_id: user.id, name: 'Unenrolled Farm', acreage: 2 })
+      .select('id').single()
+    if (!unenrolledFarm) throw new Error('unenrolledFarm seed failed')
+    unenrolledFarmId = unenrolledFarm.id
+
+    const { data: season } = await admin
+      .from('seasons')
+      .insert({
+        owner_id: user.id,
+        year: 2026,
+        status: 'active',
+        started_at: '2026-01-01',
+        contractor_name: 'Guard C',
+        predetermined_amount: 50_000,
+        spray_landlord_pct: 50,
+        fertilizer_landlord_pct: 50,
+        agreed_boxes: 0,
+      })
+      .select('id').single()
+    if (!season) throw new Error('season seed failed')
+    seasonId = season.id
+
+    // Only enroll the first farm
+    await admin.from('season_farms').insert({ season_id: seasonId, farm_id: enrolledFarmId })
+  })
+
+  afterAll(async () => {
+    clearCurrentClient()
+    if (user) await deleteTestUser(user.id)
+  })
+
+  it('rejects expense when farm_id is not enrolled in the season', async () => {
+    setCurrentClient(user.client)
+    const fd = new FormData()
+    fd.set('category', 'spray')
+    fd.set('amount', '1000')
+    fd.set('expense_date', '2026-05-01')
+    fd.set('farm_id', unenrolledFarmId)
+    fd.set('description', '')
+
+    const result = await createExpense(fd, seasonId)
+    expect(result).toHaveProperty('error')
+    const err = (result as { error: Record<string, string[]> }).error
+    expect(err.farm_id?.[0]).toMatch(/not part of this season/i)
+  })
+
+  it('accepts expense when farm_id is omitted (farm is optional)', async () => {
+    setCurrentClient(user.client)
+    const fd = new FormData()
+    fd.set('category', 'labor')
+    fd.set('amount', '500')
+    fd.set('expense_date', '2026-05-01')
+    fd.set('farm_id', '')
+    fd.set('description', '')
+
+    const result = await createExpense(fd, seasonId)
+    expect(result).toMatchObject({ success: true })
+  })
+})
