@@ -228,6 +228,7 @@ export interface Database {
           description: string | null;
           photo_path: string | null;
           linked_activity_id: string | null;
+          worker_id: string | null;
           created_at: string;
         };
         Insert: {
@@ -241,6 +242,7 @@ export interface Database {
           description?: string | null;
           photo_path?: string | null;
           linked_activity_id?: string | null;
+          worker_id?: string | null;
           created_at?: string;
         };
         Update: {
@@ -254,6 +256,7 @@ export interface Database {
           description?: string | null;
           photo_path?: string | null;
           linked_activity_id?: string | null;
+          worker_id?: string | null;
           created_at?: string;
         };
         Relationships: [];

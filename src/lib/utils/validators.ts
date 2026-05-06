@@ -33,6 +33,7 @@ export const expenseSchema = z.object({
   farm_id: z.string().optional().or(z.literal('')),
   description: z.string().optional().or(z.literal('')),
   linked_activity_id: z.string().optional().or(z.literal('')),
+  worker_id: z.string().uuid().optional().or(z.literal('')),
 })
 
 export const seasonCreateSchema = z.object({
