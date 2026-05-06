@@ -390,31 +390,30 @@ describe('recordPayment — amount validation (Phase 11C)', () => {
     const result = await recordPayment(installmentId, makeFormData('100abc'), seasonId)
     expect(result).toHaveProperty('error')
     const err = (result as { error: unknown }).error
-    if (typeof err === 'string') {
-      expect(err).toMatch(/number|valid/i)
-    } else {
-      expect((err as Record<string, unknown>).amount).toBeDefined()
-    }
+    expect(typeof err).toBe('string')
+    expect(err as string).toMatch(/number|valid/i)
   })
 
   it('rejects negative amount', async () => {
     const result = await recordPayment(installmentId, makeFormData('-5'), seasonId)
     expect(result).toHaveProperty('error')
     const err = (result as { error: unknown }).error
-    expect(err).toBeTruthy()
+    expect(typeof err).toBe('string')
+    expect(err as string).toMatch(/greater than 0/i)
   })
 
   it('rejects empty amount', async () => {
     const result = await recordPayment(installmentId, makeFormData(''), seasonId)
     expect(result).toHaveProperty('error')
     const err = (result as { error: unknown }).error
-    expect(err).toBeTruthy()
+    expect(typeof err).toBe('string')
   })
 
   it('rejects zero amount', async () => {
     const result = await recordPayment(installmentId, makeFormData('0'), seasonId)
     expect(result).toHaveProperty('error')
     const err = (result as { error: unknown }).error
-    expect(err).toBeTruthy()
+    expect(typeof err).toBe('string')
+    expect(err as string).toMatch(/greater than 0/i)
   })
 })

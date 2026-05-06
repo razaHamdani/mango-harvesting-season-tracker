@@ -41,7 +41,8 @@ export async function recordPayment(
     notes: formData.get('notes') ?? undefined,
   })
   if (!parsed.success) {
-    return { error: parsed.error.flatten().fieldErrors }
+    const messages = Object.values(parsed.error.flatten().fieldErrors).flat()
+    return { error: messages[0] ?? 'Invalid input.' }
   }
   const { amount, paid_date: paidDate, notes: rawNotes } = parsed.data
   const notes = rawNotes || null
