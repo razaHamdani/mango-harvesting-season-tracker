@@ -5,6 +5,7 @@ import type { Expense } from '@/types/database'
 export type ExpenseWithFarm = Expense & {
   farm_name: string | null
   linked_activity: { id: string; type: string; activity_date: string } | null
+  worker: { id: string; name: string } | null
 }
 
 export type ExpenseFilters = {
@@ -48,7 +49,7 @@ export async function getExpenses(
   // Embed farms(name) and linked activity to resolve in one round-trip.
   let query = supabase
     .from('expenses')
-    .select('*, farms(name), activities!linked_activity_id(id, type, activity_date)')
+    .select('*, farms(name), activities!linked_activity_id(id, type, activity_date), workers(id, name)')
     .eq('season_id', seasonId)
 
   if (filters?.category) {
@@ -80,15 +81,17 @@ export async function getExpenses(
   const rows = (data ?? []) as unknown as (Expense & {
     farms: { name: string } | null
     activities: { id: string; type: string; activity_date: string } | null
+    workers: { id: string; name: string } | null
   })[]
   const hasMore = rows.length > PAGE_SIZE
   const pageRows = rows.slice(0, PAGE_SIZE)
 
   return {
-    items: pageRows.map(({ farms, activities, ...rest }) => ({
+    items: pageRows.map(({ farms, activities, workers, ...rest }) => ({
       ...rest,
       farm_name: rest.farm_id ? (farms?.name ?? null) : null,
       linked_activity: activities ?? null,
+      worker: workers ?? null,
     })),
     nextCursor: hasMore ? offset + PAGE_SIZE : null,
   }
