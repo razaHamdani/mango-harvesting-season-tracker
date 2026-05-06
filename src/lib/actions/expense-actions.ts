@@ -56,7 +56,11 @@ export async function createExpense(formData: FormData, seasonId: string) {
   }
 
   // Resolve worker_id from parsed data (undefined/null if not a salary expense)
-  const workerId = parsed.data.worker_id || null
+  const workerId = parsed.data.worker_id ?? null
+
+  if (workerId && parsed.data.category !== 'labor') {
+    return { error: { worker_id: ['Worker can only be assigned to labor expenses.'] } }
+  }
 
   // When worker_id is supplied, verify ownership and force farm_id to null
   // (salaries are season-wide, not farm-specific)
