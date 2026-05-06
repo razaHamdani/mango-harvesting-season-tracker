@@ -28,6 +28,7 @@ export function PerAcreMetrics({ view }: { view: SeasonInsightsView }) {
     { label: 'Total Cost / Acre', value: view.totalCostPerAcre },
     { label: 'Spray Cost / Acre', value: view.sprayCostPerAcre },
     { label: 'Electricity Cost / Acre', value: view.electricityCostPerAcre },
+    { label: 'Salaries / Acre', value: view.workerSalariesPerAcre },
   ]
 
   return (
@@ -38,7 +39,7 @@ export function PerAcreMetrics({ view }: { view: SeasonInsightsView }) {
           Based on {view.totalAcreage.toFixed(2)} total acres
         </p>
       </CardHeader>
-      <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {items.map((item) => (
           <div key={item.label} className="space-y-1">
             <p className="text-xs text-muted-foreground">{item.label}</p>
