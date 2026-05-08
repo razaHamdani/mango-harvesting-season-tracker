@@ -19,12 +19,19 @@ import {
 } from '@/components/ui/select'
 import { PhotoUpload } from '@/components/photo/photo-upload'
 
+interface WorkerOption {
+  id: string
+  name: string
+  monthly_salary: number | null
+}
+
 interface ExpenseFormProps {
   seasonId: string
   farms: Farm[]
   season: Pick<Season, 'id' | 'year' | 'spray_landlord_pct' | 'fertilizer_landlord_pct'>
   userId: string
   activities?: ActivityWithFarm[]
+  workers?: WorkerOption[]
 }
 
 const EXPENSE_CATEGORIES: { value: ExpenseCategory; label: string }[] = [
@@ -37,13 +44,14 @@ const EXPENSE_CATEGORIES: { value: ExpenseCategory; label: string }[] = [
 
 type FieldErrors = Record<string, string[] | undefined>
 
-export function ExpenseForm({ seasonId, farms, season, userId, activities = [] }: ExpenseFormProps) {
+export function ExpenseForm({ seasonId, farms, season, userId, activities = [], workers = [] }: ExpenseFormProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [errors, setErrors] = useState<FieldErrors>({})
 
   const [category, setCategory] = useState<ExpenseCategory>('electricity')
   const [amount, setAmount] = useState('')
+  const [workerId, setWorkerId] = useState('')
   const [expenseDate, setExpenseDate] = useState(
     new Date().toISOString().split('T')[0]
   )
@@ -87,6 +95,7 @@ export function ExpenseForm({ seasonId, farms, season, userId, activities = [] }
       formData.set('farm_id', farmId)
       formData.set('linked_activity_id', linkedActivityId)
       formData.set('description', description)
+      formData.set('worker_id', workerId)
 
       if (photoPath) {
         formData.set('photo_path', photoPath)
@@ -115,7 +124,10 @@ export function ExpenseForm({ seasonId, farms, season, userId, activities = [] }
         <Label>Category</Label>
         <Select
           value={category}
-          onValueChange={(v) => setCategory(v as ExpenseCategory)}
+          onValueChange={(v) => {
+            setCategory(v as ExpenseCategory)
+            if (v !== 'labor') setWorkerId('')
+          }}
         >
           <SelectTrigger className="w-full">
             <SelectValue placeholder="Select category" />
@@ -132,6 +144,41 @@ export function ExpenseForm({ seasonId, farms, season, userId, activities = [] }
           <p className="text-sm text-destructive">{errors.category[0]}</p>
         )}
       </div>
+
+      {/* Worker (labor only) */}
+      {category === 'labor' && (
+        <div className="flex flex-col gap-1.5">
+          <Label>Worker (optional)</Label>
+          <Select
+            value={workerId}
+            onValueChange={(v) => {
+              const val = v ?? ''
+              setWorkerId(val)
+              if (val !== '') {
+                const worker = workers.find((w) => w.id === val)
+                if (worker && worker.monthly_salary !== null) {
+                  setAmount(String(worker.monthly_salary))
+                }
+              }
+            }}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="No specific worker" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">No specific worker</SelectItem>
+              {workers.map((worker) => (
+                <SelectItem key={worker.id} value={worker.id}>
+                  {worker.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {errors.worker_id && (
+            <p className="text-sm text-destructive">{errors.worker_id[0]}</p>
+          )}
+        </div>
+      )}
 
       {/* Amount */}
       <div className="flex flex-col gap-1.5">
@@ -196,23 +243,25 @@ export function ExpenseForm({ seasonId, farms, season, userId, activities = [] }
         )}
       </div>
 
-      {/* Farm (optional) */}
-      <div className="flex flex-col gap-1.5">
-        <Label>Farm (optional)</Label>
-        <Select value={farmId} onValueChange={(v) => setFarmId(v ?? '')}>
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder="No specific farm" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="">No specific farm</SelectItem>
-            {farms.map((farm) => (
-              <SelectItem key={farm.id} value={farm.id}>
-                {farm.name} ({farm.acreage} acres)
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      {/* Farm (optional) — hidden when a worker is selected */}
+      {!workerId && (
+        <div className="flex flex-col gap-1.5">
+          <Label>Farm (optional)</Label>
+          <Select value={farmId} onValueChange={(v) => setFarmId(v ?? '')}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="No specific farm" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">No specific farm</SelectItem>
+              {farms.map((farm) => (
+                <SelectItem key={farm.id} value={farm.id}>
+                  {farm.name} ({farm.acreage} acres)
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       {/* Linked activity */}
       {activities.length > 0 && (

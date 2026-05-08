@@ -85,7 +85,7 @@ export function ExpenseList({
             <TableHead>Activity</TableHead>
             <TableHead className="text-right">Amount</TableHead>
             <TableHead className="text-right">Landlord Cost</TableHead>
-            <TableHead>Farm</TableHead>
+            <TableHead>Farm / Worker</TableHead>
             <TableHead className="w-10">Receipt</TableHead>
             <TableHead className="w-10">Actions</TableHead>
           </TableRow>
@@ -121,7 +121,11 @@ export function ExpenseList({
               <TableCell className="text-right">
                 {formatPKR(expense.landlord_cost)}
               </TableCell>
-              <TableCell>{expense.farm_name ?? '-'}</TableCell>
+              <TableCell>
+                {expense.worker
+                  ? <span className="text-sm font-medium">{expense.worker.name}</span>
+                  : (expense.farm_name ?? '-')}
+              </TableCell>
               <TableCell>
                 {expense.photo_path && (
                   <PhotoThumbnailClient path={expense.photo_path} alt="Receipt photo" />

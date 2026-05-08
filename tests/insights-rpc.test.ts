@@ -1,6 +1,7 @@
 import { beforeAll, afterAll, describe, expect, it } from 'vitest'
 import { createAdminClient, resetDb } from './helpers/admin'
 import { createTestUser, deleteTestUser, TestUser } from './helpers/user'
+import { clearCurrentClient } from './setup'
 
 /**
  * Phase 1.1 — get_season_insights RPC must reject callers who do not
@@ -81,5 +82,88 @@ describe('get_season_insights — ownership guard', () => {
     expect(Number(obj.predetermined_amount)).toBe(100_000)
     expect(obj).toHaveProperty('total_expenses')
     expect(obj).toHaveProperty('installments_total')
+  })
+})
+
+describe('get_season_insights — worker_salaries (Phase 12)', () => {
+  const admin = createAdminClient()
+  let user: TestUser
+  let seasonId: string
+
+  beforeAll(async () => {
+    await resetDb(admin)
+    user = await createTestUser('insights-worker-12')
+
+    const { data: season } = await admin
+      .from('seasons')
+      .insert({
+        owner_id: user.id,
+        year: 2026,
+        status: 'active',
+        started_at: '2026-01-01',
+        contractor_name: 'Salary Insights C',
+        predetermined_amount: 100_000,
+        spray_landlord_pct: 50,
+        fertilizer_landlord_pct: 100,
+        agreed_boxes: 0,
+      })
+      .select('id')
+      .single()
+    if (!season) throw new Error('season seed failed')
+    seasonId = season.id
+
+    const { data: worker } = await admin
+      .from('workers')
+      .insert({
+        owner_id: user.id,
+        name: 'Insights Worker',
+        monthly_salary: 20_000,
+      })
+      .select('id')
+      .single()
+    if (!worker) throw new Error('worker seed failed')
+
+    // Expense A: salary labor expense linked to worker
+    await admin
+      .from('expenses')
+      .insert({
+        season_id: seasonId,
+        farm_id: null,
+        category: 'labor',
+        amount: 20000,
+        landlord_cost: 20000,
+        expense_date: '2026-05-01',
+        worker_id: worker.id,
+      })
+
+    // Expense B: casual labor expense (no worker)
+    await admin
+      .from('expenses')
+      .insert({
+        season_id: seasonId,
+        farm_id: null,
+        category: 'labor',
+        amount: 5000,
+        landlord_cost: 5000,
+        expense_date: '2026-05-02',
+        worker_id: null,
+      })
+  })
+
+  afterAll(async () => {
+    clearCurrentClient()
+    if (user) await deleteTestUser(user.id)
+  })
+
+  it('worker_salaries counts only labor expenses with worker_id set', async () => {
+    const { data, error } = await user.client.rpc('get_season_insights', {
+      p_season_id: seasonId,
+    })
+
+    expect(error).toBeNull()
+    expect(data).toBeDefined()
+    const obj = data as Record<string, unknown>
+    expect(Number(obj.worker_salaries)).toBe(20000)
+    expect(Number(obj.total_expenses)).toBe(25000)
   })
 })

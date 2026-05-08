@@ -2,6 +2,7 @@ import { notFound, redirect } from 'next/navigation'
 import { getCurrentUser } from '@/lib/queries/_user-context'
 import { getSeasonById } from '@/lib/queries/season-queries'
 import { getSeasonFarms, getActivities } from '@/lib/queries/activity-queries'
+import { getWorkers } from '@/lib/queries/worker-queries'
 import { ExpenseForm } from '@/components/expense/expense-form'
 
 export default async function NewExpensePage({
@@ -14,10 +15,11 @@ export default async function NewExpensePage({
   const user = await getCurrentUser()
   if (!user) redirect('/login')
 
-  const [season, farms, { items: activities }] = await Promise.all([
+  const [season, farms, { items: activities }, workers] = await Promise.all([
     getSeasonById(seasonId),
     getSeasonFarms(seasonId),
     getActivities(seasonId),
+    getWorkers(),
   ])
 
   if (!season) {
@@ -39,6 +41,7 @@ export default async function NewExpensePage({
         season={season}
         userId={user.id}
         activities={activities}
+        workers={workers}
       />
     </div>
   )

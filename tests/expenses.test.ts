@@ -673,3 +673,148 @@ describe('createExpense — farm membership guard (Phase 11B)', () => {
     expect(result).toMatchObject({ success: true })
   })
 })
+
+describe('createExpense — worker_id linkage (Phase 12)', () => {
+  const admin = createAdminClient()
+  let user: TestUser
+  let seasonId: string
+  let workerId: string
+
+  beforeAll(async () => {
+    await resetDb(admin)
+    user = await createTestUser('exp-worker-12')
+
+    const { data: season } = await admin
+      .from('seasons')
+      .insert({
+        owner_id: user.id,
+        year: 2026,
+        status: 'active',
+        started_at: '2026-01-01',
+        contractor_name: 'Salary C',
+        predetermined_amount: 200_000,
+        spray_landlord_pct: 50,
+        fertilizer_landlord_pct: 100,
+        agreed_boxes: 0,
+      })
+      .select('id')
+      .single()
+    if (!season) throw new Error('season seed failed')
+    seasonId = season.id
+
+    const { data: worker } = await admin
+      .from('workers')
+      .insert({
+        owner_id: user.id,
+        name: 'Test Worker',
+        monthly_salary: 30_000,
+      })
+      .select('id')
+      .single()
+    if (!worker) throw new Error('worker seed failed')
+    workerId = worker.id
+  })
+
+  afterAll(async () => {
+    clearCurrentClient()
+    if (user) await deleteTestUser(user.id)
+  })
+
+  it('labor expense with valid worker_id succeeds and landlord_cost === amount', async () => {
+    setCurrentClient(user.client)
+    const fd = new FormData()
+    fd.set('category', 'labor')
+    fd.set('amount', '30000')
+    fd.set('expense_date', '2026-05-01')
+    fd.set('farm_id', '')
+    fd.set('description', '')
+    fd.set('worker_id', workerId)
+
+    const result = await createExpense(fd, seasonId)
+    expect(result).toMatchObject({ success: true })
+
+    const { data: row } = await admin
+      .from('expenses')
+      .select('amount, landlord_cost, worker_id')
+      .eq('season_id', seasonId)
+      .eq('worker_id', workerId)
+      .single()
+
+    expect(row).not.toBeNull()
+    expect(Number(row!.landlord_cost)).toBe(Number(row!.amount))
+    expect(Number(row!.amount)).toBe(30000)
+    expect(row!.worker_id).toBe(workerId)
+  })
+
+  it('worker_id from another user is rejected', async () => {
+    const userB = await createTestUser('exp-worker-12-b')
+    try {
+      const { data: workerB } = await admin
+        .from('workers')
+        .insert({
+          owner_id: userB.id,
+          name: 'User B Worker',
+          monthly_salary: 25_000,
+        })
+        .select('id')
+        .single()
+      if (!workerB) throw new Error('workerB seed failed')
+
+      setCurrentClient(user.client)
+      const fd = new FormData()
+      fd.set('category', 'labor')
+      fd.set('amount', '25000')
+      fd.set('expense_date', '2026-05-01')
+      fd.set('farm_id', '')
+      fd.set('description', '')
+      fd.set('worker_id', workerB.id)
+
+      const result = await createExpense(fd, seasonId)
+      expect(result).toHaveProperty('error')
+      const err = (result as { error: Record<string, string[]> }).error
+      expect(err.worker_id?.[0]).toMatch(/not found/i)
+    } finally {
+      await deleteTestUser(userB.id)
+    }
+  })
+
+  it('non-labor category with worker_id is rejected', async () => {
+    setCurrentClient(user.client)
+    const fd = new FormData()
+    fd.set('category', 'spray')
+    fd.set('amount', '1000')
+    fd.set('expense_date', '2026-05-01')
+    fd.set('farm_id', '')
+    fd.set('description', '')
+    fd.set('worker_id', workerId)
+
+    const result = await createExpense(fd, seasonId)
+    expect(result).toHaveProperty('error')
+    const err = (result as { error: Record<string, string[]> }).error
+    expect(err.worker_id?.[0]).toMatch(/only.*labor|labor.*only/i)
+  })
+
+  it('farm_id is stored as null when worker_id is supplied', async () => {
+    setCurrentClient(user.client)
+    const fd = new FormData()
+    fd.set('category', 'labor')
+    fd.set('amount', '30000')
+    fd.set('expense_date', '2026-05-02')
+    fd.set('farm_id', '')
+    fd.set('description', '')
+    fd.set('worker_id', workerId)
+
+    const result = await createExpense(fd, seasonId)
+    expect(result).toMatchObject({ success: true })
+
+    const expenseId = (result as { success: true; expenseId: string }).expenseId
+    const { data: row } = await admin
+      .from('expenses')
+      .select('farm_id')
+      .eq('id', expenseId)
+      .single()
+
+    expect(row).not.toBeNull()
+    expect(row!.farm_id).toBeNull()
+  })
+})

@@ -2,10 +2,11 @@
 
 ## Currently Working On
 
-Nothing — Phase 11 complete.
+Phase 12 implementation complete — pending final review and merge to main.
 
 ## Completed
 
+- [x] Phase 12: Worker salaries via labor category + worker FK — nullable `worker_id UUID` FK on `expenses` (ON DELETE SET NULL) with DB CHECK `(worker_id IS NULL OR category = 'labor')`; `assertWorkerOwned` guard in server action; `farm_id` forced null when worker linked; `get_season_insights` RPC gains `worker_salaries` CTE field (labor expenses with `worker_id IS NOT NULL`); `SeasonInsightsView` gains `workerSalaries` / `workerSalariesPerAcre`; PerAcreMetrics gains "Salaries / Acre" tile; ExpenseForm shows worker dropdown + auto-fills amount when `category = 'labor'`; ExpenseList shows worker name in Farm/Worker column; 5 new tests; 122 tests passing; tsc clean
 - [x] Phase 11A: DB-layer integrity — new migration `20260504120000_farm_season_membership.sql` tightens `activities` and `expenses` RLS WITH CHECK clauses to require `farm_id ∈ season_farms` for the same season; wrapped in transaction with IF EXISTS guards and rollback comment; `schema.sql` updated to match
 - [x] Phase 11B: App-layer farm guard — new `src/lib/utils/farm-season-guard.ts` (`assertFarmInSeason`); wired into `createActivity` (required, field-keyed error) and `createExpense` (optional, only when farm_id non-empty); DB errors propagated; 4 new tests in activities/expenses test files; 112 tests passing
 - [x] Phase 11C: Hardened payment input — `paymentSchema` added to `validators.ts` with `z.coerce.number()` + finite+positive refines; `payment-actions.ts` replaces `parseFloat` block with Zod parse, returns flattened string error for UI compatibility; 4 new amount-validation tests; 116 tests passing
@@ -103,3 +104,6 @@ Nothing — Phase 11 complete.
 - 2026-05-01: Phase 9.5A — `email_exists` RPC is an intentional enumeration vector; user explicitly accepted this trade-off (friendlier UX over enumeration resistance).
 - 2026-05-01: Phase 9.5A — removed fallback A ("For security purposes" string match) and fallback B (`identities.length === 0`); RPC pre-check is now the single authoritative duplicate-email gate. If the RPC itself errors, fail-closed and do not proceed to `signUp`.
 - 2026-04-28: B1 keeps `beforeSend` hook in sentry.{server,edge}.config.ts as defense-in-depth — if `next/headers` ever exposes the value via `event.request.headers`, the tag still attaches; otherwise the per-async-context scope path is authoritative.
+- 2026-05-08: Phase 12 — reused `labor` category instead of new `worker_salary` enum; avoids touching schema CHECK, Zod enum, duty-split, breakdown chart, and filter list.
+- 2026-05-08: Phase 12 — `worker_id` FK is nullable; ON DELETE SET NULL means deleting a worker orphans its historical expenses (still labor, just unattributed) rather than cascading.
+- 2026-05-08: Phase 12 — `farm_id` forced null at the app layer when `worker_id` is set. Salary expenses are season-wide, not farm-specific. Phase 11A RLS already permits `farm_id IS NULL`.
