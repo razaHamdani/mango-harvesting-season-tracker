@@ -11,12 +11,17 @@ export async function assertWorkerOwned(
   workerId: string,
   userId: string,
 ): Promise<WorkerGuard> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('workers')
     .select('id')
     .eq('id', workerId)
     .eq('owner_id', userId)
     .maybeSingle()
+
+  if (error) {
+    console.error('[assertWorkerOwned] query failed', error)
+    return { ok: false, error: 'Failed to verify worker. Please try again.' }
+  }
   if (!data) return { ok: false, error: 'Selected worker not found.' }
   return { ok: true }
 }

@@ -818,3 +818,231 @@ describe('createExpense — worker_id linkage (Phase 12)', () => {
     expect(row!.farm_id).toBeNull()
   })
 })
+
+/**
+ * Phase 12.1A — getExpenses embeds worker name for salary rows.
+ * The embedded join workers(id, name) must resolve correctly and
+ * farm_name must be null for worker-linked expenses.
+ */
+describe('getExpenses — embedded worker (Phase 12.1A)', () => {
+  const admin = createAdminClient()
+  let user: TestUser
+  let seasonId: string
+  let workerId: string
+
+  beforeAll(async () => {
+    await resetDb(admin)
+    user = await createTestUser('exp-worker-embed')
+
+    const { data: season } = await admin
+      .from('seasons')
+      .insert({
+        owner_id: user.id,
+        year: 2026,
+        status: 'active',
+        started_at: '2026-01-01',
+        contractor_name: 'Embed C',
+        predetermined_amount: 100_000,
+        spray_landlord_pct: 50,
+        fertilizer_landlord_pct: 100,
+        agreed_boxes: 0,
+      })
+      .select('id')
+      .single()
+    if (!season) throw new Error('season seed failed')
+    seasonId = season.id
+
+    const { data: worker } = await admin
+      .from('workers')
+      .insert({ owner_id: user.id, name: 'Embedded Worker', monthly_salary: 20_000 })
+      .select('id')
+      .single()
+    if (!worker) throw new Error('worker seed failed')
+    workerId = worker.id
+
+    await admin.from('expenses').insert({
+      season_id: seasonId,
+      category: 'labor',
+      amount: 20_000,
+      landlord_cost: 20_000,
+      expense_date: '2026-05-01',
+      worker_id: workerId,
+    })
+  })
+
+  afterAll(async () => {
+    clearCurrentClient()
+    if (user) await deleteTestUser(user.id)
+  })
+
+  it('returns worker.name and null farm_name for a salary expense', async () => {
+    setCurrentClient(user.client)
+    const { items } = await getExpenses(seasonId)
+    const found = items.find((e) => e.worker?.id === workerId)
+
+    expect(found).toBeDefined()
+    expect(found!.worker).not.toBeNull()
+    expect(found!.worker!.name).toBe('Embedded Worker')
+    expect(found!.farm_name).toBeNull()
+  })
+})
+
+/**
+ * Phase 12.1B — DB CHECK constraints fire at the Postgres level.
+ * Verifies the app-layer guards are backed by real DB constraints,
+ * independent of the server action code path.
+ */
+describe('expenses DB CHECK constraints (Phase 12.1B)', () => {
+  const admin = createAdminClient()
+  let user: TestUser
+  let seasonId: string
+  let workerId: string
+
+  beforeAll(async () => {
+    await resetDb(admin)
+    user = await createTestUser('exp-db-check')
+
+    const { data: season } = await admin
+      .from('seasons')
+      .insert({
+        owner_id: user.id,
+        year: 2026,
+        status: 'active',
+        started_at: '2026-01-01',
+        contractor_name: 'Check C',
+        predetermined_amount: 100_000,
+        spray_landlord_pct: 50,
+        fertilizer_landlord_pct: 100,
+        agreed_boxes: 0,
+      })
+      .select('id')
+      .single()
+    if (!season) throw new Error('season seed failed')
+    seasonId = season.id
+
+    const { data: worker } = await admin
+      .from('workers')
+      .insert({ owner_id: user.id, name: 'Check Worker', monthly_salary: 15_000 })
+      .select('id')
+      .single()
+    if (!worker) throw new Error('worker seed failed')
+    workerId = worker.id
+  })
+
+  afterAll(async () => {
+    clearCurrentClient()
+    if (user) await deleteTestUser(user.id)
+  })
+
+  it('rejects worker_id on non-labor category at the DB level', async () => {
+    // landlord_cost === amount so only the category constraint fires,
+    // not the salary-full-landlord constraint.
+    const { error } = await admin
+      .from('expenses')
+      .insert({
+        season_id: seasonId,
+        category: 'spray',
+        amount: 1000,
+        landlord_cost: 1000,
+        expense_date: '2026-05-01',
+        worker_id: workerId,
+      })
+
+    expect(error).not.toBeNull()
+    expect(error!.message).toMatch(/expenses_worker_only_for_labor/)
+  })
+
+  it('rejects landlord_cost ≠ amount when worker_id is set at the DB level', async () => {
+    const { error } = await admin
+      .from('expenses')
+      .insert({
+        season_id: seasonId,
+        category: 'labor',
+        amount: 15_000,
+        landlord_cost: 7_500, // should equal amount when worker_id is set
+        expense_date: '2026-05-01',
+        worker_id: workerId,
+      })
+
+    expect(error).not.toBeNull()
+    expect(error!.message).toMatch(/expenses_salary_full_landlord/)
+  })
+})
+
+/**
+ * Phase 12.1C — ON DELETE SET NULL behaviour.
+ * Deleting a worker must orphan the linked expense (worker_id → NULL)
+ * rather than cascading the delete or throwing an error.
+ */
+describe('expenses worker ON DELETE SET NULL (Phase 12.1C)', () => {
+  const admin = createAdminClient()
+  let user: TestUser
+  let seasonId: string
+  let expenseId: string
+
+  beforeAll(async () => {
+    await resetDb(admin)
+    user = await createTestUser('exp-on-delete')
+
+    const { data: season } = await admin
+      .from('seasons')
+      .insert({
+        owner_id: user.id,
+        year: 2026,
+        status: 'active',
+        started_at: '2026-01-01',
+        contractor_name: 'Delete C',
+        predetermined_amount: 100_000,
+        spray_landlord_pct: 50,
+        fertilizer_landlord_pct: 100,
+        agreed_boxes: 0,
+      })
+      .select('id')
+      .single()
+    if (!season) throw new Error('season seed failed')
+    seasonId = season.id
+
+    const { data: worker } = await admin
+      .from('workers')
+      .insert({ owner_id: user.id, name: 'Deleteable Worker', monthly_salary: 10_000 })
+      .select('id')
+      .single()
+    if (!worker) throw new Error('worker seed failed')
+
+    const { data: expense } = await admin
+      .from('expenses')
+      .insert({
+        season_id: seasonId,
+        category: 'labor',
+        amount: 10_000,
+        landlord_cost: 10_000,
+        expense_date: '2026-05-01',
+        worker_id: worker.id,
+      })
+      .select('id')
+      .single()
+    if (!expense) throw new Error('expense seed failed')
+    expenseId = expense.id
+
+    // Delete the worker — triggers ON DELETE SET NULL
+    await admin.from('workers').delete().eq('id', worker.id)
+  })
+
+  afterAll(async () => {
+    clearCurrentClient()
+    if (user) await deleteTestUser(user.id)
+  })
+
+  it('expense row still exists with worker_id set to null after worker deletion', async () => {
+    const { data: row } = await admin
+      .from('expenses')
+      .select('id, worker_id, category, amount')
+      .eq('id', expenseId)
+      .single()
+
+    expect(row).not.toBeNull()
+    expect(row!.worker_id).toBeNull()
+    expect(row!.category).toBe('labor')
+    expect(Number(row!.amount)).toBe(10_000)
+  })
+})

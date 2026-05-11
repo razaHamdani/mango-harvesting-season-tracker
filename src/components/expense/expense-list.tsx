@@ -147,7 +147,7 @@ export function ExpenseList({
         </TableBody>
         <TableFooter>
           <TableRow>
-            <TableCell colSpan={3} className="font-medium">
+            <TableCell colSpan={4} className="font-medium">
               Total
             </TableCell>
             <TableCell className="text-right font-medium">
@@ -156,7 +156,7 @@ export function ExpenseList({
             <TableCell className="text-right font-medium">
               {formatPKR(totalLandlordCost)}
             </TableCell>
-            <TableCell colSpan={4} />
+            <TableCell colSpan={3} />
           </TableRow>
         </TableFooter>
       </Table>

@@ -2,10 +2,11 @@
 
 ## Currently Working On
 
-Phase 12 implementation complete — pending final review and merge to main.
+Nothing — Phase 12 + Phase 12.1 hardening complete.
 
 ## Completed
 
+- [x] Phase 12.1: Post-review hardening — new migration `20260508120000_expenses_salary_full_landlord.sql` adds DB CHECK `(worker_id IS NULL OR landlord_cost = amount)`; schema.sql mirrored; `getWorkers()` adds explicit `owner_id` filter + user guard (defense-in-depth); `expense-list.tsx` footer colSpan fixed (3→4 / 4→3) for 9-column alignment; `assertWorkerOwned` distinguishes query errors from not-found (mirrors `assertFarmInSeason` pattern + logging); 4 new DB-level tests (embedded worker name, category CHECK, salary CHECK, ON DELETE SET NULL); 126 tests passing; tsc clean
 - [x] Phase 12: Worker salaries via labor category + worker FK — nullable `worker_id UUID` FK on `expenses` (ON DELETE SET NULL) with DB CHECK `(worker_id IS NULL OR category = 'labor')`; `assertWorkerOwned` guard in server action; `farm_id` forced null when worker linked; `get_season_insights` RPC gains `worker_salaries` CTE field (labor expenses with `worker_id IS NOT NULL`); `SeasonInsightsView` gains `workerSalaries` / `workerSalariesPerAcre`; PerAcreMetrics gains "Salaries / Acre" tile; ExpenseForm shows worker dropdown + auto-fills amount when `category = 'labor'`; ExpenseList shows worker name in Farm/Worker column; 5 new tests; 122 tests passing; tsc clean
 - [x] Phase 11A: DB-layer integrity — new migration `20260504120000_farm_season_membership.sql` tightens `activities` and `expenses` RLS WITH CHECK clauses to require `farm_id ∈ season_farms` for the same season; wrapped in transaction with IF EXISTS guards and rollback comment; `schema.sql` updated to match
 - [x] Phase 11B: App-layer farm guard — new `src/lib/utils/farm-season-guard.ts` (`assertFarmInSeason`); wired into `createActivity` (required, field-keyed error) and `createExpense` (optional, only when farm_id non-empty); DB errors propagated; 4 new tests in activities/expenses test files; 112 tests passing
@@ -107,3 +108,6 @@ Phase 12 implementation complete — pending final review and merge to main.
 - 2026-05-08: Phase 12 — reused `labor` category instead of new `worker_salary` enum; avoids touching schema CHECK, Zod enum, duty-split, breakdown chart, and filter list.
 - 2026-05-08: Phase 12 — `worker_id` FK is nullable; ON DELETE SET NULL means deleting a worker orphans its historical expenses (still labor, just unattributed) rather than cascading.
 - 2026-05-08: Phase 12 — `farm_id` forced null at the app layer when `worker_id` is set. Salary expenses are season-wide, not farm-specific. Phase 11A RLS already permits `farm_id IS NULL`.
+- 2026-05-08: Phase 12.1 — `expenses_salary_full_landlord` CHECK uses DROP/ADD idempotent pattern (not `ADD IF NOT EXISTS` which is invalid for CHECK constraints in Postgres).
+- 2026-05-08: Phase 12.1 — DB CHECK constraint ordering is not guaranteed; the category-gate test sets `landlord_cost = amount` so only `expenses_worker_only_for_labor` fires (not `expenses_salary_full_landlord` which also applies to that row).
+- 2026-05-08: Phase 12.1 — footer colSpan misalignment was pre-existing (table was already 9 columns before Phase 12); fixed opportunistically since the file was already hot.

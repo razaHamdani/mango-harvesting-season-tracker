@@ -109,6 +109,10 @@ ALTER TABLE public.expenses
   ADD CONSTRAINT expenses_worker_only_for_labor
   CHECK (worker_id IS NULL OR category = 'labor');
 
+ALTER TABLE public.expenses
+  ADD CONSTRAINT expenses_salary_full_landlord
+  CHECK (worker_id IS NULL OR landlord_cost = amount);
+
 CREATE INDEX idx_expenses_worker_id
   ON public.expenses(worker_id) WHERE worker_id IS NOT NULL;
 
