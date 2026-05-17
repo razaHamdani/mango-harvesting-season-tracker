@@ -147,6 +147,63 @@ export async function getSeasonInsights(
   return data as unknown as SeasonInsights
 }
 
+export type ActiveSeasonSnapshot = {
+  id: string
+  year: number
+  contractor_name: string
+  day_of_harvest: number
+  paid_pct: number
+}
+
+export async function getActiveSeasonSnapshot(): Promise<ActiveSeasonSnapshot | null> {
+  const user = await getCurrentUser()
+  if (!user) return null
+
+  const supabase = await createClient()
+
+  const { data: season, error } = await supabase
+    .from('seasons')
+    .select('id, year, contractor_name, started_at, predetermined_amount')
+    .eq('owner_id', user.id)
+    .eq('status', 'active')
+    .not('started_at', 'is', null)
+    .order('started_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error || !season || !season.started_at) return null
+
+  const startedAt = new Date(season.started_at).getTime()
+  const today = Date.now()
+  const day_of_harvest = Math.max(
+    0,
+    Math.floor((today - startedAt) / 86400000),
+  )
+
+  const { data: installments } = await supabase
+    .from('installments')
+    .select('paid_amount')
+    .eq('season_id', season.id)
+
+  const paid_sum = (installments ?? []).reduce(
+    (s, i) => s + (i.paid_amount ?? 0),
+    0,
+  )
+  const predetermined = season.predetermined_amount || 0
+  const paid_pct =
+    predetermined > 0
+      ? Math.max(0, Math.min(100, (paid_sum / predetermined) * 100))
+      : 0
+
+  return {
+    id: season.id,
+    year: season.year,
+    contractor_name: season.contractor_name,
+    day_of_harvest,
+    paid_pct,
+  }
+}
+
 export type DashboardData = {
   activeSeason:
     | (Season & {

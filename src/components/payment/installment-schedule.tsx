@@ -4,37 +4,35 @@ import { useState } from 'react'
 import type { Installment } from '@/types/database'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import { ImageIcon } from 'lucide-react'
 import { PaymentForm } from '@/components/payment/payment-form'
 import { formatPKR } from '@/lib/utils/format'
 
-function getStatus(installment: Installment): 'paid' | 'overdue' | 'pending' {
-  if (installment.paid_amount !== null) return 'paid'
+type Status = 'paid' | 'overdue' | 'current' | 'future'
+
+function computeStatuses(installments: Installment[]): Status[] {
   const today = new Date().toISOString().split('T')[0]
-  if (installment.due_date < today) return 'overdue'
-  return 'pending'
+  let foundCurrent = false
+  return installments.map((inst) => {
+    if (inst.paid_amount !== null) return 'paid'
+    if (inst.due_date < today) return 'overdue'
+    if (!foundCurrent) {
+      foundCurrent = true
+      return 'current'
+    }
+    return 'future'
+  })
 }
 
-function StatusBadge({ status }: { status: 'paid' | 'overdue' | 'pending' }) {
+function StatusBadge({ status }: { status: Status }) {
   switch (status) {
     case 'paid':
-      return (
-        <Badge className="bg-green-500/10 text-green-700 dark:text-green-400">
-          Paid
-        </Badge>
-      )
+      return <Badge variant="paid">Paid</Badge>
     case 'overdue':
-      return <Badge variant="destructive">Overdue</Badge>
-    case 'pending':
-      return <Badge variant="secondary">Pending</Badge>
+      return <Badge variant="overdue">Overdue</Badge>
+    case 'current':
+      return <Badge variant="active">Due</Badge>
+    case 'future':
+      return <Badge variant="pending">Upcoming</Badge>
   }
 }
 
@@ -52,59 +50,70 @@ export function InstallmentSchedule({
   const [selectedInstallment, setSelectedInstallment] =
     useState<Installment | null>(null)
 
+  const statuses = computeStatuses(installments)
+  const totalExpected = installments.reduce((s, i) => s + i.expected_amount, 0)
+
   return (
     <>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-12">#</TableHead>
-            <TableHead>Expected Amount</TableHead>
-            <TableHead>Due Date</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Paid Amount</TableHead>
-            <TableHead>Paid Date</TableHead>
-            <TableHead className="w-12">Receipt</TableHead>
-            <TableHead className="w-24">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {installments.map((inst) => {
-            const status = getStatus(inst)
-            return (
-              <TableRow key={inst.id}>
-                <TableCell>{inst.installment_number}</TableCell>
-                <TableCell>{formatPKR(inst.expected_amount)}</TableCell>
-                <TableCell>{inst.due_date}</TableCell>
-                <TableCell>
+      <div className="timeline">
+        {installments.map((inst, i) => {
+          const status = statuses[i]
+          return (
+            <div className={`timeline__row ${status}`} key={inst.id}>
+              <div className="timeline__dot">
+                <span className="dot-inner" />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span className="h-2">Installment #{inst.installment_number}</span>
                   <StatusBadge status={status} />
-                </TableCell>
-                <TableCell>
-                  {inst.paid_amount !== null ? formatPKR(inst.paid_amount) : '-'}
-                </TableCell>
-                <TableCell>{inst.paid_date ?? '-'}</TableCell>
-                <TableCell>
-                  {inst.receipt_photo_path ? (
-                    <ImageIcon className="size-4 text-muted-foreground" />
-                  ) : (
-                    '-'
-                  )}
-                </TableCell>
-                <TableCell>
-                  {inst.paid_amount === null && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setSelectedInstallment(inst)}
-                    >
-                      Record Payment
+                </div>
+                <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 4 }}>
+                  Due {inst.due_date}
+                  {status === 'paid' && ` · Paid ${formatPKR(inst.paid_amount!)} on ${inst.paid_date}`}
+                </div>
+                {status === 'current' && (
+                  <div style={{ marginTop: 12 }}>
+                    <Button variant="default" size="sm" onClick={() => setSelectedInstallment(inst)}>
+                      Record payment
                     </Button>
-                  )}
-                </TableCell>
-              </TableRow>
-            )
-          })}
-        </TableBody>
-      </Table>
+                  </div>
+                )}
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div
+                  className="mono"
+                  style={{
+                    fontSize: status === 'current' ? 20 : 16,
+                    fontWeight: 600,
+                    color: 'var(--heading)',
+                  }}
+                >
+                  {formatPKR(inst.expected_amount)}
+                </div>
+                {status === 'paid' && inst.paid_amount !== inst.expected_amount && (
+                  <div className="muted t-12" style={{ marginTop: 2 }}>
+                    Actual {formatPKR(inst.paid_amount!)}
+                  </div>
+                )}
+              </div>
+            </div>
+          )
+        })}
+        {/* Final completion node */}
+        <div className="timeline__row final" style={{ opacity: 0.45 }}>
+          <div className="timeline__dot">
+            <span className="dot-inner" />
+          </div>
+          <div>
+            <div className="h-2">Season fully paid</div>
+            <div className="t-12 muted mt-2">All installments settled.</div>
+          </div>
+          <div className="mono" style={{ fontSize: 16, color: 'var(--text-muted)' }}>
+            {formatPKR(totalExpected)}
+          </div>
+        </div>
+      </div>
 
       {selectedInstallment && (
         <PaymentForm

@@ -1,25 +1,15 @@
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
 import type { SeasonInsightsView } from '@/lib/queries/insights-queries'
 import { formatPKR } from '@/lib/utils/format'
 
 export function PerAcreMetrics({ view }: { view: SeasonInsightsView }) {
   if (view.totalAcreage <= 0) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Per-Acre Metrics</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
-            Add farms to this season to see per-acre metrics.
-          </p>
-        </CardContent>
-      </Card>
+      <div className="card card__pad">
+        <div className="card__title">Per-acre metrics</div>
+        <p className="muted text-sm mt-2">
+          Add farms to this season to see per-acre metrics.
+        </p>
+      </div>
     )
   }
 
@@ -27,26 +17,28 @@ export function PerAcreMetrics({ view }: { view: SeasonInsightsView }) {
     { label: 'Revenue / Acre', value: view.revenuePerAcre },
     { label: 'Total Cost / Acre', value: view.totalCostPerAcre },
     { label: 'Spray Cost / Acre', value: view.sprayCostPerAcre },
-    { label: 'Electricity Cost / Acre', value: view.electricityCostPerAcre },
+    { label: 'Electricity / Acre', value: view.electricityCostPerAcre },
     { label: 'Salaries / Acre', value: view.workerSalariesPerAcre },
   ]
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Per-Acre Metrics</CardTitle>
-        <p className="text-xs text-muted-foreground">
-          Based on {view.totalAcreage.toFixed(2)} total acres
-        </p>
-      </CardHeader>
-      <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        {items.map((item) => (
-          <div key={item.label} className="space-y-1">
-            <p className="text-xs text-muted-foreground">{item.label}</p>
-            <p className="text-lg font-semibold">{formatPKR(item.value)}</p>
+    <div className="card card__pad">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18 }}>
+        <div>
+          <div className="card__title">Per-acre metrics</div>
+          <div className="card__sub">
+            Based on {view.totalAcreage.toFixed(2)} total acres
+          </div>
+        </div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,minmax(0,1fr))', gap: 20 }}>
+        {items.map((p) => (
+          <div key={p.label} className="kpi">
+            <div className="kpi__label">{p.label}</div>
+            <div className="kpi__value">{formatPKR(p.value)}</div>
           </div>
         ))}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }

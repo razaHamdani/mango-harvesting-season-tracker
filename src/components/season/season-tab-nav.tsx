@@ -17,7 +17,11 @@ export function SeasonTabNav({ seasonId }: { seasonId: string }) {
   const basePath = `/seasons/${seasonId}`
 
   return (
-    <nav className="flex gap-1 border-b">
+    <nav
+      className="flex gap-1 border-b border-[color:var(--border)] px-1"
+      role="tablist"
+      aria-label="Season sections"
+    >
       {tabs.map((tab) => {
         const href = `${basePath}${tab.segment}`
         const isActive =
@@ -29,11 +33,13 @@ export function SeasonTabNav({ seasonId }: { seasonId: string }) {
           <Link
             key={tab.segment}
             href={href}
+            role="tab"
+            aria-selected={isActive}
             className={cn(
-              'px-4 py-2 text-sm font-medium transition-colors -mb-px',
+              'inline-flex h-9 items-center px-3.5 -mb-px text-sm transition-colors border-b-2',
               isActive
-                ? 'border-b-2 border-primary text-primary'
-                : 'text-muted-foreground hover:text-foreground'
+                ? 'border-[color:var(--mango)] text-[color:var(--heading)] font-medium'
+                : 'border-transparent text-[color:var(--text-muted)] hover:text-[color:var(--heading)]'
             )}
           >
             {tab.label}

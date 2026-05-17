@@ -1,26 +1,28 @@
-"use client";
+import { AppShellClient } from "@/components/layout/app-shell-client";
+import { SidebarSeasonCard } from "@/components/layout/sidebar-season-card";
+import { getCurrentProfile } from "@/lib/queries/profile-queries";
+import type { SidebarUser } from "@/components/layout/sidebar";
 
-import { usePathname } from "next/navigation";
-import { Sidebar } from "@/components/layout/sidebar";
-import { Header } from "@/components/layout/header";
+export async function AppShell({ children }: { children: React.ReactNode }) {
+  const profile = await getCurrentProfile();
 
-const PUBLIC_ROUTES = ["/login"];
-
-export function AppShell({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
-  const isPublicRoute = PUBLIC_ROUTES.includes(pathname);
-
-  if (isPublicRoute) {
-    return <>{children}</>;
-  }
+  const user: SidebarUser | null = profile
+    ? {
+        name: profile.full_name || "Account",
+        role:
+          profile.role === "landlord"
+            ? "Landlord"
+            : profile.role === "contractor"
+              ? "Contractor"
+              : profile.role === "admin"
+                ? "Admin"
+                : "Member",
+      }
+    : null;
 
   return (
-    <div className="flex h-full">
-      <div data-print="hide"><Sidebar /></div>
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <div data-print="hide"><Header /></div>
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">{children}</main>
-      </div>
-    </div>
+    <AppShellClient seasonCard={<SidebarSeasonCard />} user={user}>
+      {children}
+    </AppShellClient>
   );
 }

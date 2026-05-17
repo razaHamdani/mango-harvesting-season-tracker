@@ -2,25 +2,25 @@
 
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { useCallback } from 'react'
+import { Zap, Sparkles, Leaf, User, Package } from 'lucide-react'
 import type { Farm } from '@/types/database'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { cn } from '@/lib/utils'
+import { formatPKR } from '@/lib/utils/format'
 
-const EXPENSE_CATEGORIES = [
-  { value: '', label: 'All Categories' },
-  { value: 'electricity', label: 'Electricity' },
-  { value: 'spray', label: 'Spray' },
-  { value: 'fertilizer', label: 'Fertilizer' },
-  { value: 'labor', label: 'Labor' },
-  { value: 'misc', label: 'Misc' },
+const CATEGORY_CHIPS = [
+  { key: 'electricity', label: 'Electricity', icon: Zap },
+  { key: 'spray', label: 'Spray', icon: Sparkles },
+  { key: 'fertilizer', label: 'Fertilizer', icon: Leaf },
+  { key: 'labor', label: 'Labor', icon: User },
+  { key: 'misc', label: 'Misc', icon: Package },
 ]
 
 interface ExpenseFiltersProps {
   farms: Farm[]
+  amounts: Record<string, number>
 }
 
-export function ExpenseFilters({ farms }: ExpenseFiltersProps) {
+export function ExpenseFilters({ farms, amounts }: ExpenseFiltersProps) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -30,87 +30,73 @@ export function ExpenseFilters({ farms }: ExpenseFiltersProps) {
   const dateFrom = searchParams.get('dateFrom') ?? ''
   const dateTo = searchParams.get('dateTo') ?? ''
 
-  const hasFilters = category || farmId || dateFrom || dateTo
-
   const updateParam = useCallback(
     (key: string, value: string) => {
       const params = new URLSearchParams(searchParams.toString())
-      if (value) {
-        params.set(key, value)
-      } else {
-        params.delete(key)
-      }
+      if (value) params.set(key, value)
+      else params.delete(key)
       router.push(`${pathname}?${params.toString()}`)
     },
-    [router, pathname, searchParams]
+    [router, pathname, searchParams],
   )
 
-  const clearFilters = useCallback(() => {
-    router.push(pathname)
-  }, [router, pathname])
+  const toggleCategory = useCallback(
+    (k: string) => updateParam('category', category === k ? '' : k),
+    [updateParam, category],
+  )
 
   return (
-    <div className="flex flex-wrap items-end gap-3">
-      <div className="space-y-1">
-        <Label htmlFor="filter-category">Category</Label>
-        <select
-          id="filter-category"
-          value={category}
-          onChange={(e) => updateParam('category', e.target.value)}
-          className="flex h-8 w-[140px] items-center rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
-        >
-          {EXPENSE_CATEGORIES.map((c) => (
-            <option key={c.value} value={c.value}>
-              {c.label}
-            </option>
-          ))}
-        </select>
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap gap-2">
+        {CATEGORY_CHIPS.map(({ key, label, icon: Icon }) => {
+          const isActive = category === key
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => toggleCategory(key)}
+              className={cn('chip', isActive && 'active')}
+              aria-pressed={isActive}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {label}
+              <span className="chip__count mono tnum">
+                {formatPKR(amounts[key] ?? 0)}
+              </span>
+            </button>
+          )
+        })}
       </div>
 
-      <div className="space-y-1">
-        <Label htmlFor="filter-farm">Farm</Label>
+      <div className="flex flex-wrap items-center gap-2">
         <select
-          id="filter-farm"
           value={farmId}
           onChange={(e) => updateParam('farmId', e.target.value)}
-          className="flex h-8 w-[160px] items-center rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
+          aria-label="Filter by farm"
+          className="h-8 rounded-lg border border-[color:var(--border)] bg-transparent px-2.5 text-sm outline-none focus-visible:border-[color:var(--mango)] focus-visible:ring-3 focus-visible:ring-[color:var(--mango)]/30"
         >
-          <option value="">All Farms</option>
+          <option value="">All farms</option>
           {farms.map((farm) => (
             <option key={farm.id} value={farm.id}>
               {farm.name}
             </option>
           ))}
         </select>
-      </div>
-
-      <div className="space-y-1">
-        <Label htmlFor="filter-date-from">From</Label>
-        <Input
-          id="filter-date-from"
+        <input
           type="date"
           value={dateFrom}
           onChange={(e) => updateParam('dateFrom', e.target.value)}
-          className="h-8 w-[150px]"
+          aria-label="From date"
+          className="h-8 rounded-lg border border-[color:var(--border)] bg-transparent px-2.5 text-sm outline-none focus-visible:border-[color:var(--mango)] focus-visible:ring-3 focus-visible:ring-[color:var(--mango)]/30"
         />
-      </div>
-
-      <div className="space-y-1">
-        <Label htmlFor="filter-date-to">To</Label>
-        <Input
-          id="filter-date-to"
+        <input
           type="date"
           value={dateTo}
           onChange={(e) => updateParam('dateTo', e.target.value)}
-          className="h-8 w-[150px]"
+          aria-label="To date"
+          className="h-8 rounded-lg border border-[color:var(--border)] bg-transparent px-2.5 text-sm outline-none focus-visible:border-[color:var(--mango)] focus-visible:ring-3 focus-visible:ring-[color:var(--mango)]/30"
         />
       </div>
-
-      {hasFilters && (
-        <Button variant="ghost" size="sm" onClick={clearFilters}>
-          Clear Filters
-        </Button>
-      )}
     </div>
   )
 }

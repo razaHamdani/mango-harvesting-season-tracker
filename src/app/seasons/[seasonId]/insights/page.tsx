@@ -59,7 +59,7 @@ export default async function SeasonInsightsPage({
   const docTitle = `Insights-${season.year}-${season.contractor_name.replace(/\s+/g, '-')}.pdf`
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6 mt-6">
       {/* Print-only report header */}
       <div className="print-only border-b pb-4 mb-2">
         <p className="text-sm text-gray-500">
@@ -80,7 +80,7 @@ export default async function SeasonInsightsPage({
 
       <SummaryCards view={view} />
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.3fr) minmax(0,1fr)', gap: 24 }}>
         <ExpenseBreakdownChart expensesByCategory={view.expensesByCategory} />
         <PerAcreMetrics view={view} />
       </div>
