@@ -70,7 +70,7 @@ export function InstallmentSchedule({
                 </div>
                 <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 4 }}>
                   Due {inst.due_date}
-                  {status === 'paid' && ` · Paid ${formatPKR(inst.paid_amount!)} on ${inst.paid_date}`}
+                  {status === 'paid' && <> · Paid <span className="tnum">{formatPKR(inst.paid_amount!)}</span> on {inst.paid_date}</>}
                 </div>
                 {status === 'current' && (
                   <div style={{ marginTop: 12 }}>
@@ -92,7 +92,7 @@ export function InstallmentSchedule({
                   {formatPKR(inst.expected_amount)}
                 </div>
                 {status === 'paid' && inst.paid_amount !== inst.expected_amount && (
-                  <div className="muted t-12" style={{ marginTop: 2 }}>
+                  <div className="muted t-12 tnum" style={{ marginTop: 2 }}>
                     Actual {formatPKR(inst.paid_amount!)}
                   </div>
                 )}

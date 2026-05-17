@@ -7,7 +7,7 @@ export function SummaryCards({ view }: { view: SeasonInsightsView }) {
       <div className="card card__pad kpi">
         <div className="kpi__label">Predetermined amount</div>
         <div className="kpi__value">{formatPKR(view.predeterminedAmount)}</div>
-        <div className="kpi__sub">{formatPKR(view.totalPaymentsReceived)} received</div>
+        <div className="kpi__sub"><span className="tnum">{formatPKR(view.totalPaymentsReceived)}</span> received</div>
       </div>
       <div className="card card__pad kpi">
         <div className="kpi__label">Total expenses</div>

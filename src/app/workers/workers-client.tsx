@@ -5,7 +5,6 @@ import type { Worker } from '@/types/database'
 import { deleteWorker, toggleWorkerActive } from '@/lib/actions/worker-actions'
 import { WorkerForm } from '@/components/worker/worker-form'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import {
   Dialog,
   DialogContent,
@@ -15,14 +14,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
+import { Trash2 } from 'lucide-react'
 import { formatPKR } from '@/lib/utils/format'
 
 interface WorkersClientProps {
@@ -75,12 +67,10 @@ export function WorkersClient({ workers }: WorkersClientProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between" style={{marginBottom:24}}>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Workers</h1>
-          <p className="text-sm text-muted-foreground">
-            Manage your farm workers
-          </p>
+          <h1 style={{fontSize:24,color:'var(--heading)',fontWeight:600,letterSpacing:'-0.02em'}}>Workers</h1>
+          <div className="muted t-14 mt-1">{workers.filter(w => w.is_active).length} active · {workers.filter(w => !w.is_active).length} inactive</div>
         </div>
         <Dialog
           open={formOpen}
@@ -115,65 +105,43 @@ export function WorkersClient({ workers }: WorkersClientProps) {
           </p>
         </div>
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Phone</TableHead>
-              <TableHead>Monthly Salary</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {workers.map((worker) => (
-              <TableRow key={worker.id}>
-                <TableCell className="font-medium">{worker.name}</TableCell>
-                <TableCell>{worker.phone || '-'}</TableCell>
-                <TableCell>
-                  {worker.monthly_salary
-                    ? formatPKR(worker.monthly_salary)
-                    : '-'}
-                </TableCell>
-                <TableCell>
-                  {worker.is_active ? (
-                    <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                      Active
-                    </Badge>
-                  ) : (
-                    <Badge variant="secondary">Inactive</Badge>
+        <div className="card overflow-hidden">
+          <div className="list">
+            {workers.map((worker, i) => (
+              <div key={worker.id} style={{padding:'18px 24px', borderTop: i === 0 ? '0' : '1px solid var(--border)', display:'flex', alignItems:'center', justifyContent:'space-between', opacity: worker.is_active ? 1 : 0.65}}>
+                <div style={{display:'flex', alignItems:'center', gap:14}}>
+                  <div style={{width:40,height:40,borderRadius:999,background:'var(--clay-soft)',display:'grid',placeItems:'center',color:'var(--bark)',fontWeight:600,fontSize:13,flexShrink:0}}>
+                    {worker.name.split(' ').map(s => s[0]).slice(0,2).join('')}
+                  </div>
+                  <div>
+                    <div style={{fontWeight:500,color:'var(--heading)'}}>{worker.name}</div>
+                    <div className="t-12 muted mt-1">{worker.phone ?? '—'}</div>
+                  </div>
+                </div>
+                <div style={{display:'flex', alignItems:'center', gap:24}}>
+                  {worker.monthly_salary != null && (
+                    <div style={{textAlign:'right'}}>
+                      <div className="mono" style={{fontWeight:600,color:'var(--heading)'}}>{formatPKR(worker.monthly_salary)}</div>
+                      <div className="t-12 muted">per month</div>
+                    </div>
                   )}
-                </TableCell>
-                <TableCell className="text-right">
-                  <div className="flex justify-end gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleEditClick(worker)}
-                    >
-                      Edit
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleToggleActive(worker)}
-                      disabled={isToggling}
-                    >
+                  <div style={{display:'flex', alignItems:'center', gap:8}}>
+                    <span className="t-12 muted">{worker.is_active ? 'Active' : 'Inactive'}</span>
+                    <Button variant="ghost" size="sm" onClick={() => handleToggleActive(worker)} disabled={isToggling}>
                       {worker.is_active ? 'Deactivate' : 'Activate'}
                     </Button>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => handleDeleteClick(worker)}
-                    >
-                      Delete
-                    </Button>
                   </div>
-                </TableCell>
-              </TableRow>
+                  <div style={{display:'flex', alignItems:'center', gap:8}}>
+                    <Button variant="ghost" size="sm" onClick={() => handleEditClick(worker)}>Edit</Button>
+                    <button className="icon-btn" onClick={() => handleDeleteClick(worker)} aria-label="Delete worker">
+                      <Trash2 className="h-[14px] w-[14px]" />
+                    </button>
+                  </div>
+                </div>
+              </div>
             ))}
-          </TableBody>
-        </Table>
+          </div>
+        </div>
       )}
 
       <Dialog
