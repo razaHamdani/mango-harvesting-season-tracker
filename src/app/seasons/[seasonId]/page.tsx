@@ -1,12 +1,6 @@
 import { notFound } from 'next/navigation'
+import { Home } from 'lucide-react'
 import { getSeasonById, getSeasonInsights } from '@/lib/queries/season-queries'
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
-import { Separator } from '@/components/ui/separator'
 import { DutySplitDisplay } from '@/components/season/duty-split-display'
 import { SeasonActionButtons } from '@/components/season/season-action-buttons'
 import { formatPKR } from '@/lib/utils/format'
@@ -26,170 +20,99 @@ export default async function SeasonOverviewPage({
     notFound()
   }
 
-  const expenseCategories = insights
-    ? Object.entries(insights.expenses_by_category).sort(
-        ([, a], [, b]) => b - a
-      )
-    : []
-
-  const totalPaid = season.installments.reduce(
-    (sum, inst) => sum + (inst.paid_amount ?? 0),
-    0
-  )
-  const paymentProgress =
-    season.predetermined_amount > 0
-      ? Math.min((totalPaid / season.predetermined_amount) * 100, 100)
-      : 0
+  const predetermined = season.predetermined_amount
+  const received = insights?.total_payments_received ?? 0
+  const receivedPct =
+    predetermined > 0 ? Math.round((received / predetermined) * 100) : 0
+  const agreedBoxes = season.agreed_boxes
+  const collectedBoxes = season.boxes_received
+  const boxPct =
+    agreedBoxes > 0 ? Math.round((collectedBoxes / agreedBoxes) * 100) : 0
 
   return (
-    <div className="space-y-6">
-      {/* Action Buttons */}
+    <div className="flex flex-col gap-6">
       <SeasonActionButtons seasonId={season.id} status={season.status} />
 
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* Contract Summary */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Contract Summary</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Contractor</span>
-              <span className="font-medium">{season.contractor_name}</span>
-            </div>
-            {season.contractor_phone && (
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Phone</span>
-                <span className="font-medium">{season.contractor_phone}</span>
-              </div>
-            )}
-            {season.contractor_cnic && (
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">CNIC</span>
-                <span className="font-medium">{season.contractor_cnic}</span>
-              </div>
-            )}
-            <Separator />
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Predetermined Amount</span>
-              <span className="font-medium">{formatPKR(season.predetermined_amount)}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Agreed Boxes</span>
-              <span className="font-medium">{season.agreed_boxes}</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Duty Split */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Duty Split</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <DutySplitDisplay
-              sprayLandlordPct={season.spray_landlord_pct}
-              fertilizerLandlordPct={season.fertilizer_landlord_pct}
-            />
-          </CardContent>
-        </Card>
-
-        {/* Payment Progress */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Payment Progress</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="text-sm">
-              {formatPKR(totalPaid)} of {formatPKR(season.predetermined_amount)} received
-            </div>
-            <div className="h-3 w-full overflow-hidden rounded-full bg-muted">
-              <div
-                className="h-full rounded-full bg-green-500 transition-all"
-                style={{ width: `${paymentProgress}%` }}
-              />
-            </div>
-            <div className="text-xs text-muted-foreground">
-              {paymentProgress.toFixed(0)}% complete
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Box Tracker */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Box Tracker</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="text-sm">
-              {season.boxes_received} of {season.agreed_boxes} boxes received
-            </div>
-            <div className="h-3 w-full overflow-hidden rounded-full bg-muted">
-              <div
-                className="h-full rounded-full bg-blue-500 transition-all"
-                style={{
-                  width: `${season.agreed_boxes > 0 ? Math.min((season.boxes_received / season.agreed_boxes) * 100, 100) : 0}%`,
-                }}
-              />
-            </div>
-          </CardContent>
-        </Card>
+      {/* KPI strip */}
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="kpi">
+          <div className="kpi__label">Predetermined</div>
+          <div className="kpi__value">{formatPKR(predetermined)}</div>
+        </div>
+        <div className="kpi">
+          <div className="kpi__label">Received</div>
+          <div className="kpi__value">{formatPKR(received)}</div>
+          <div className="kpi__sub">({receivedPct}%) of contract</div>
+        </div>
+        <div className="kpi">
+          <div className="kpi__label">Agreed boxes</div>
+          <div className="kpi__value">{agreedBoxes}</div>
+        </div>
+        <div className="kpi">
+          <div className="kpi__label">Collected boxes</div>
+          <div className="kpi__value">{collectedBoxes}</div>
+          <div className="kpi__sub">({boxPct}%) of agreed</div>
+        </div>
       </div>
 
-      {/* Expenses Summary */}
-      {insights && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Expenses Summary (Landlord Share)</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="flex justify-between text-sm font-medium">
-              <span>Total Landlord Cost</span>
-              <span>{formatPKR(insights.total_expenses)}</span>
-            </div>
-            {expenseCategories.length > 0 && <Separator />}
-            {expenseCategories.map(([category, amount]) => (
-              <div key={category} className="flex justify-between text-sm">
-                <span className="text-muted-foreground capitalize">
-                  {category}
-                </span>
-                <span>{formatPKR(amount)}</span>
-              </div>
-            ))}
-            {expenseCategories.length === 0 && (
-              <p className="text-sm text-muted-foreground">
-                No expenses recorded yet.
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      )}
+      {/* 60/40 grid */}
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+        <DutySplitDisplay
+          sprayLandlordPct={season.spray_landlord_pct}
+          fertilizerLandlordPct={season.fertilizer_landlord_pct}
+          expensesByCategory={insights?.expenses_by_category ?? {}}
+        />
 
-      {/* Farm Summary */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Farm Summary</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {season.farms.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No farms assigned.</p>
-          ) : (
-            <>
-              {season.farms.map((farm) => (
-                <div key={farm.id} className="flex justify-between text-sm">
-                  <span>{farm.name}</span>
-                  <span className="text-muted-foreground">{farm.acreage} acres</span>
+        <div className="card">
+          <div className="px-6 pt-5 pb-2">
+            <div className="card__title">Farms</div>
+            <div className="card__sub">
+              {season.farms.length} farms · {season.total_acreage.toFixed(2)} acres
+            </div>
+          </div>
+          <div className="pb-2">
+            {season.farms.length === 0 ? (
+              <p className="px-6 py-4 text-sm text-[color:var(--text-muted)]">
+                No farms assigned.
+              </p>
+            ) : (
+              season.farms.map((farm, i) => (
+                <div
+                  key={farm.id}
+                  className="flex items-center justify-between px-6 py-3"
+                  style={{
+                    borderTop:
+                      i === 0 ? '0' : '1px solid var(--border)',
+                  }}
+                >
+                  <div className="flex items-center gap-3">
+                    <span
+                      className="grid place-items-center rounded-full"
+                      style={{
+                        width: 36,
+                        height: 36,
+                        background: 'var(--leaf-soft)',
+                        color: 'oklch(0.35 0.13 145)',
+                      }}
+                      aria-hidden="true"
+                    >
+                      <Home className="h-4 w-4" />
+                    </span>
+                    <div>
+                      <div className="text-[13.5px] font-medium text-[color:var(--heading)]">
+                        {farm.name}
+                      </div>
+                      <div className="text-xs text-[color:var(--text-muted)] mt-0.5">
+                        {farm.acreage} acres
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              ))}
-              <Separator />
-              <div className="flex justify-between text-sm font-medium">
-                <span>Total</span>
-                <span>{season.total_acreage.toFixed(2)} acres</span>
-              </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

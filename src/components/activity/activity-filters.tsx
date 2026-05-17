@@ -2,24 +2,23 @@
 
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { useCallback } from 'react'
+import { Sparkles, Droplet, Leaf, Package } from 'lucide-react'
 import type { Farm } from '@/types/database'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { cn } from '@/lib/utils'
 
-const ACTIVITY_TYPES = [
-  { value: '', label: 'All Types' },
-  { value: 'spray', label: 'Spray' },
-  { value: 'water', label: 'Water' },
-  { value: 'fertilize', label: 'Fertilize' },
-  { value: 'harvest', label: 'Harvest' },
+const TYPE_CHIPS = [
+  { key: 'spray', label: 'Spray', icon: Sparkles },
+  { key: 'water', label: 'Water', icon: Droplet },
+  { key: 'fertilize', label: 'Fertilize', icon: Leaf },
+  { key: 'harvest', label: 'Harvest', icon: Package },
 ]
 
 interface ActivityFiltersProps {
   farms: Farm[]
+  counts: Record<string, number>
 }
 
-export function ActivityFilters({ farms }: ActivityFiltersProps) {
+export function ActivityFilters({ farms, counts }: ActivityFiltersProps) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -29,87 +28,71 @@ export function ActivityFilters({ farms }: ActivityFiltersProps) {
   const dateFrom = searchParams.get('dateFrom') ?? ''
   const dateTo = searchParams.get('dateTo') ?? ''
 
-  const hasFilters = type || farmId || dateFrom || dateTo
-
   const updateParam = useCallback(
     (key: string, value: string) => {
       const params = new URLSearchParams(searchParams.toString())
-      if (value) {
-        params.set(key, value)
-      } else {
-        params.delete(key)
-      }
+      if (value) params.set(key, value)
+      else params.delete(key)
       router.push(`${pathname}?${params.toString()}`)
     },
-    [router, pathname, searchParams]
+    [router, pathname, searchParams],
   )
 
-  const clearFilters = useCallback(() => {
-    router.push(pathname)
-  }, [router, pathname])
+  const toggleType = useCallback(
+    (k: string) => updateParam('type', type === k ? '' : k),
+    [updateParam, type],
+  )
 
   return (
-    <div className="flex flex-wrap items-end gap-3">
-      <div className="space-y-1">
-        <Label htmlFor="filter-type">Type</Label>
-        <select
-          id="filter-type"
-          value={type}
-          onChange={(e) => updateParam('type', e.target.value)}
-          className="flex h-8 w-[140px] items-center rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
-        >
-          {ACTIVITY_TYPES.map((t) => (
-            <option key={t.value} value={t.value}>
-              {t.label}
-            </option>
-          ))}
-        </select>
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap gap-2">
+        {TYPE_CHIPS.map(({ key, label, icon: Icon }) => {
+          const isActive = type === key
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => toggleType(key)}
+              className={cn('chip', isActive && 'active')}
+              aria-pressed={isActive}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {label}
+              <span className="chip__count tnum">{counts[key] ?? 0}</span>
+            </button>
+          )
+        })}
       </div>
 
-      <div className="space-y-1">
-        <Label htmlFor="filter-farm">Farm</Label>
+      <div className="flex flex-wrap items-center gap-2">
         <select
-          id="filter-farm"
           value={farmId}
           onChange={(e) => updateParam('farmId', e.target.value)}
-          className="flex h-8 w-[160px] items-center rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
+          aria-label="Filter by farm"
+          className="h-8 rounded-lg border border-[color:var(--border)] bg-transparent px-2.5 text-sm outline-none focus-visible:border-[color:var(--mango)] focus-visible:ring-3 focus-visible:ring-[color:var(--mango)]/30"
         >
-          <option value="">All Farms</option>
+          <option value="">All farms</option>
           {farms.map((farm) => (
             <option key={farm.id} value={farm.id}>
               {farm.name}
             </option>
           ))}
         </select>
-      </div>
-
-      <div className="space-y-1">
-        <Label htmlFor="filter-date-from">From</Label>
-        <Input
-          id="filter-date-from"
+        <input
           type="date"
           value={dateFrom}
           onChange={(e) => updateParam('dateFrom', e.target.value)}
-          className="h-8 w-[150px]"
+          aria-label="From date"
+          className="h-8 rounded-lg border border-[color:var(--border)] bg-transparent px-2.5 text-sm outline-none focus-visible:border-[color:var(--mango)] focus-visible:ring-3 focus-visible:ring-[color:var(--mango)]/30"
         />
-      </div>
-
-      <div className="space-y-1">
-        <Label htmlFor="filter-date-to">To</Label>
-        <Input
-          id="filter-date-to"
+        <input
           type="date"
           value={dateTo}
           onChange={(e) => updateParam('dateTo', e.target.value)}
-          className="h-8 w-[150px]"
+          aria-label="To date"
+          className="h-8 rounded-lg border border-[color:var(--border)] bg-transparent px-2.5 text-sm outline-none focus-visible:border-[color:var(--mango)] focus-visible:ring-3 focus-visible:ring-[color:var(--mango)]/30"
         />
       </div>
-
-      {hasFilters && (
-        <Button variant="ghost" size="sm" onClick={clearFilters}>
-          Clear Filters
-        </Button>
-      )}
     </div>
   )
 }

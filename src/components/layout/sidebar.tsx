@@ -1,106 +1,49 @@
 "use client";
 
+import * as React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import {
+  LayoutDashboard,
+  Sprout,
+  Home,
+  Users,
+  LogOut,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 
-const navItems = [
-  {
-    label: "Dashboard",
-    href: "/dashboard",
-    icon: (
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width="18"
-        height="18"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <rect x="3" y="3" width="7" height="7" />
-        <rect x="14" y="3" width="7" height="7" />
-        <rect x="3" y="14" width="7" height="7" />
-        <rect x="14" y="14" width="7" height="7" />
-      </svg>
-    ),
-  },
-  {
-    label: "Seasons",
-    href: "/seasons",
-    icon: (
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width="18"
-        height="18"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <circle cx="12" cy="12" r="5" />
-        <line x1="12" y1="1" x2="12" y2="3" />
-        <line x1="12" y1="21" x2="12" y2="23" />
-        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-        <line x1="1" y1="12" x2="3" y2="12" />
-        <line x1="21" y1="12" x2="23" y2="12" />
-        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
-        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-      </svg>
-    ),
-  },
-  {
-    label: "Farms",
-    href: "/farms",
-    icon: (
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width="18"
-        height="18"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-        <polyline points="9 22 9 12 15 12 15 22" />
-      </svg>
-    ),
-  },
-  {
-    label: "Workers",
-    href: "/workers",
-    icon: (
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width="18"
-        height="18"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-        <circle cx="9" cy="7" r="4" />
-        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-      </svg>
-    ),
-  },
+type NavItem = {
+  label: string;
+  href: string;
+  Icon: React.ComponentType<{ size?: number; className?: string }>;
+};
+
+const NAV_ITEMS: NavItem[] = [
+  { label: "Dashboard", href: "/dashboard", Icon: LayoutDashboard },
+  { label: "Seasons", href: "/seasons", Icon: Sprout },
+  { label: "Farms", href: "/farms", Icon: Home },
+  { label: "Workers", href: "/workers", Icon: Users },
 ];
 
-export function Sidebar() {
+export type SidebarUser = {
+  name: string;
+  role: string;
+};
+
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+export function Sidebar({
+  seasonCard,
+  user,
+}: {
+  seasonCard?: React.ReactNode;
+  user?: SidebarUser | null;
+}) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -110,56 +53,171 @@ export function Sidebar() {
     router.push("/login");
   }
 
+  const displayName = user?.name?.trim() || "Account";
+  const displayRole = user?.role || "Landlord";
+  const initials = getInitials(displayName);
+
   return (
-    <aside className="hidden h-full w-60 flex-col border-r bg-zinc-950 text-zinc-100 md:flex">
-      <div className="flex h-14 items-center px-5">
-        <span className="text-lg font-bold tracking-tight">AamDaata</span>
+    <aside
+      className="hidden h-screen w-60 flex-col border-r md:flex"
+      style={{
+        background: "var(--bark)",
+        color: "oklch(0.92 0.02 80)",
+        borderRightColor: "oklch(1 0 0 / 6%)",
+      }}
+    >
+      {/* Brand */}
+      <div
+        className="flex items-center gap-[10px]"
+        style={{ padding: "22px 20px 18px" }}
+      >
+        <div
+          className="rounded-lg"
+          style={{
+            width: 28,
+            height: 28,
+            background:
+              "linear-gradient(135deg, var(--mango) 0%, var(--mango-deep) 100%)",
+            display: "grid",
+            placeItems: "center",
+            boxShadow: "inset 0 0 0 1px oklch(1 0 0 / 15%)",
+          }}
+          aria-hidden="true"
+        />
+        <div>
+          <div
+            style={{
+              fontWeight: 600,
+              fontSize: 16,
+              letterSpacing: "-0.02em",
+              color: "var(--cream)",
+            }}
+          >
+            AamDaata
+          </div>
+          <div
+            style={{
+              fontSize: "10.5px",
+              color: "oklch(0.72 0.04 80)",
+              marginTop: -2,
+              letterSpacing: "0.04em",
+              textTransform: "uppercase",
+            }}
+          >
+            Orchard ledger
+          </div>
+        </div>
       </div>
-      <Separator className="bg-zinc-800" />
-      <nav className="flex-1 space-y-1 px-3 py-4">
-        {navItems.map((item) => {
+
+      {/* Nav */}
+      <nav className="flex-1" style={{ padding: "6px 10px" }}>
+        <div
+          style={{
+            fontSize: "10.5px",
+            textTransform: "uppercase",
+            letterSpacing: "0.08em",
+            color: "oklch(0.62 0.02 70)",
+            padding: "14px 10px 6px",
+          }}
+        >
+          Workspace
+        </div>
+        {NAV_ITEMS.map((item) => {
           const isActive =
             pathname === item.href || pathname.startsWith(item.href + "/");
+          const Icon = item.Icon;
           return (
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                isActive
-                  ? "bg-zinc-800 text-white"
-                  : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100"
-              }`}
+              className="flex items-center transition-colors"
+              style={{
+                gap: 11,
+                padding: "9px 10px",
+                borderRadius: 8,
+                fontSize: "13.5px",
+                color: isActive ? "var(--cream)" : "oklch(0.78 0.02 70)",
+                background: isActive ? "oklch(1 0 0 / 6%)" : "transparent",
+                boxShadow: isActive
+                  ? "inset 2px 0 0 var(--mango)"
+                  : "none",
+              }}
             >
-              {item.icon}
-              {item.label}
+              <span
+                style={{
+                  color: isActive ? "var(--mango)" : "oklch(0.72 0.06 75)",
+                  display: "inline-flex",
+                }}
+              >
+                <Icon size={16} />
+              </span>
+              <span>{item.label}</span>
             </Link>
           );
         })}
       </nav>
-      <Separator className="bg-zinc-800" />
-      <div className="px-3 py-4">
-        <Button
-          variant="ghost"
-          className="w-full justify-start gap-3 text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100"
-          onClick={handleSignOut}
+
+      {/* Season card slot */}
+      {seasonCard}
+
+      {/* Footer */}
+      <div
+        className="flex items-center"
+        style={{
+          padding: "12px 14px 16px",
+          borderTop: "1px solid oklch(1 0 0 / 6%)",
+          gap: 10,
+        }}
+      >
+        <div
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: 999,
+            background:
+              "linear-gradient(135deg, var(--mango) 0%, var(--rust) 100%)",
+            display: "grid",
+            placeItems: "center",
+            color: "var(--bark)",
+            fontWeight: 600,
+            fontSize: 12,
+            flexShrink: 0,
+          }}
+          aria-hidden="true"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+          {initials}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div
+            style={{
+              fontSize: 13,
+              color: "var(--cream)",
+              fontWeight: 500,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
           >
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-            <polyline points="16 17 21 12 16 7" />
-            <line x1="21" y1="12" x2="9" y2="12" />
-          </svg>
-          Sign out
-        </Button>
+            {displayName}
+          </div>
+          <div style={{ fontSize: "11.5px", color: "oklch(0.72 0.02 70)" }}>
+            {displayRole}
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={handleSignOut}
+          aria-label="Sign out"
+          className="inline-flex items-center justify-center rounded-md transition-colors"
+          style={{
+            width: 28,
+            height: 28,
+            color: "oklch(0.65 0.02 70)",
+            background: "transparent",
+          }}
+        >
+          <LogOut size={16} />
+        </button>
       </div>
     </aside>
   );

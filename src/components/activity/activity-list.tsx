@@ -1,46 +1,65 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import Link from 'next/link'
-import { Trash2Icon } from 'lucide-react'
-import type { ActivityWithFarm, ActivityFilters } from '@/lib/queries/activity-queries'
+import { Sparkles, Droplet, Leaf, Package, Trash2 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
+import type {
+  ActivityWithFarm,
+  ActivityFilters,
+} from '@/lib/queries/activity-queries'
 import { PhotoThumbnailClient } from '@/components/photo/photo-thumbnail-client'
 import { deleteActivity } from '@/lib/actions/activity-actions'
 import { loadMoreActivities } from '@/lib/actions/list-actions'
 import { formatDate } from '@/lib/utils/format'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 
-const TYPE_STYLES: Record<string, string> = {
-  spray: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
-  water: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-  fertilize: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-  harvest: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
+const TYPE_META: Record<
+  string,
+  { icon: LucideIcon; cls: 'spray' | 'water' | 'fertilize' | 'harvest' }
+> = {
+  spray: { icon: Sparkles, cls: 'spray' },
+  water: { icon: Droplet, cls: 'water' },
+  fertilize: { icon: Leaf, cls: 'fertilize' },
+  harvest: { icon: Package, cls: 'harvest' },
 }
 
-function getDetails(activity: ActivityWithFarm): string {
+function describe(activity: ActivityWithFarm): {
+  title: string
+  quantity: string
+} {
   switch (activity.type) {
     case 'spray':
+      return {
+        title: activity.item_name
+          ? `Spray — ${activity.item_name}`
+          : 'Spray',
+        quantity: '',
+      }
     case 'fertilize':
-      return activity.item_name ?? '-'
+      return {
+        title: activity.item_name
+          ? `Fertilize — ${activity.item_name}`
+          : 'Fertilize',
+        quantity: '',
+      }
     case 'water':
-      return activity.meter_reading != null
-        ? `Meter: ${activity.meter_reading}`
-        : '-'
+      return {
+        title: 'Water',
+        quantity:
+          activity.meter_reading != null
+            ? `${activity.meter_reading} m³`
+            : '',
+      }
     case 'harvest':
-      return activity.boxes_collected != null
-        ? `${activity.boxes_collected} boxes`
-        : '-'
+      return {
+        title: 'Harvest',
+        quantity:
+          activity.boxes_collected != null
+            ? `${activity.boxes_collected} boxes`
+            : '',
+      }
     default:
-      return '-'
+      return { title: activity.type, quantity: '' }
   }
 }
 
@@ -76,7 +95,11 @@ export function ActivityList({
   function handleLoadMore() {
     if (cursor === null) return
     startTransition(async () => {
-      const { items: more, nextCursor } = await loadMoreActivities(seasonId, filters, cursor)
+      const { items: more, nextCursor } = await loadMoreActivities(
+        seasonId,
+        filters,
+        cursor,
+      )
       setItems((prev) => [...prev, ...more])
       setCursor(nextCursor)
     })
@@ -84,73 +107,71 @@ export function ActivityList({
 
   return (
     <>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Date</TableHead>
-            <TableHead>Type</TableHead>
-            <TableHead>Farm</TableHead>
-            <TableHead>Details</TableHead>
-            <TableHead className="w-10">Photo</TableHead>
-            <TableHead>Expenses</TableHead>
-            <TableHead className="w-10">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {items.map((activity) => (
-            <TableRow key={activity.id} id={`activity-${activity.id}`}>
-              <TableCell>{formatDate(activity.activity_date)}</TableCell>
-              <TableCell>
-                <Badge
-                  className={TYPE_STYLES[activity.type] ?? ''}
-                  variant="secondary"
+      <div className="card overflow-hidden">
+        <div className="list">
+          {items.map((activity) => {
+            const meta = TYPE_META[activity.type] ?? TYPE_META.spray
+            const Icon = meta.icon
+            const { title, quantity } = describe(activity)
+            return (
+              <div
+                key={activity.id}
+                id={`activity-${activity.id}`}
+                className="activity-row group"
+                style={{
+                  gridTemplateColumns:
+                    '40px minmax(0,1fr) 110px 48px 36px',
+                }}
+              >
+                <div
+                  className={`activity-icon ${meta.cls}`}
+                  aria-hidden="true"
                 >
-                  {activity.type}
-                </Badge>
-              </TableCell>
-              <TableCell>{activity.farm_name}</TableCell>
-              <TableCell>{getDetails(activity)}</TableCell>
-              <TableCell>
-                {activity.photo_path && (
-                  <PhotoThumbnailClient path={activity.photo_path} alt="Activity photo" />
-                )}
-              </TableCell>
-              <TableCell>
-                {activity.linked_expenses.length === 0 ? (
-                  <span className="text-muted-foreground">—</span>
-                ) : (
-                  <div className="flex flex-col gap-1">
-                    {activity.linked_expenses.map((e) => (
-                      <Link
-                        key={e.id}
-                        href={`/seasons/${seasonId}/expenses#expense-${e.id}`}
-                        className="text-sm text-primary underline-offset-4 hover:underline"
-                      >
-                        {e.description ?? e.category} · PKR {e.amount.toLocaleString()}
-                      </Link>
-                    ))}
+                  <Icon className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <div className="activity-title truncate">{title}</div>
+                  <div className="activity-meta truncate">
+                    {activity.farm_name} ·{' '}
+                    {formatDate(activity.activity_date)}
                   </div>
-                )}
-              </TableCell>
-              <TableCell>
-                <Button
-                  variant="ghost"
-                  size="sm"
+                </div>
+                <div className="mono tnum text-right text-[13px] text-[color:var(--heading)]">
+                  {quantity}
+                </div>
+                <div className="flex items-center justify-center">
+                  {activity.photo_path ? (
+                    <PhotoThumbnailClient
+                      path={activity.photo_path}
+                      alt="Activity photo"
+                    />
+                  ) : (
+                    <div className="h-12 w-12" aria-hidden="true" />
+                  )}
+                </div>
+                <button
+                  type="button"
+                  className="icon-btn opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50"
                   disabled={isPending}
                   onClick={() => handleDelete(activity.id)}
-                  className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                  aria-label="Delete activity"
                 >
-                  <Trash2Icon className="h-4 w-4" />
-                </Button>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )
+          })}
+        </div>
+      </div>
 
       {cursor !== null && (
         <div className="mt-4 flex justify-center">
-          <Button variant="outline" size="sm" disabled={isPending} onClick={handleLoadMore}>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={isPending}
+            onClick={handleLoadMore}
+          >
             {isPending ? 'Loading…' : 'Load more'}
           </Button>
         </div>

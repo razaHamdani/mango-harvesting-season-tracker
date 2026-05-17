@@ -33,52 +33,68 @@ export default async function PaymentsPage({
     0
   )
   const predeterminedAmount = season.predetermined_amount
-  const isOverpaid = totalReceived > predeterminedAmount
   const paymentPercentage =
     predeterminedAmount > 0
       ? Math.round((totalReceived / predeterminedAmount) * 100)
       : 0
   const barWidth = Math.min(paymentPercentage, 100)
 
-  return (
-    <div className="space-y-6">
-      <h2 className="text-lg font-semibold">Payments</h2>
+  const nextDue = installments.find((i) => i.paid_amount === null) ?? null
 
-      {/* Progress Bar */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between text-sm">
-          <span>
-            {formatPKR(totalReceived)} of {formatPKR(predeterminedAmount)}{' '}
-            received ({paymentPercentage}%)
-          </span>
+  return (
+    <div className="flex flex-col gap-6 mt-6">
+      {/* 3-col KPI row */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', gap: 16 }}>
+        <div className="card card__pad">
+          <div className="section-label">Received</div>
+          <div className="mono" style={{ fontSize: 24, fontWeight: 600, marginTop: 6, color: 'var(--heading)' }}>
+            {formatPKR(totalReceived)}
+          </div>
+          <div style={{ height: 4, background: 'var(--border)', borderRadius: 999, marginTop: 10, overflow: 'hidden' }}>
+            <div style={{ height: '100%', background: 'var(--leaf)', borderRadius: 999, width: `${barWidth}%`, transition: 'width 0.3s' }} />
+          </div>
+          <div className="muted t-12 mt-2">{paymentPercentage}% of {formatPKR(predeterminedAmount)}</div>
         </div>
-        <div className="h-3 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
-          <div
-            className="h-full rounded-full bg-green-500 transition-all"
-            style={{ width: `${barWidth}%` }}
-          />
+        <div className="card card__pad">
+          <div className="section-label">Remaining</div>
+          <div className="mono" style={{ fontSize: 24, fontWeight: 600, marginTop: 6, color: 'var(--heading)' }}>
+            {formatPKR(Math.max(0, predeterminedAmount - totalReceived))}
+          </div>
+          <div className="muted t-12 mt-3">
+            {installments.filter((i) => i.paid_amount === null).length} installments to go
+          </div>
         </div>
+        {nextDue ? (
+          <div className="card card__pad">
+            <div className="section-label">Next due</div>
+            <div className="mono" style={{ fontSize: 24, fontWeight: 600, marginTop: 6, color: 'var(--heading)' }}>
+              {formatPKR(nextDue.expected_amount)}
+            </div>
+            <div className="muted t-12 mt-3">{nextDue.due_date}</div>
+          </div>
+        ) : (
+          <div className="card card__pad">
+            <div className="section-label">Next due</div>
+            <div className="muted t-14 mt-3">All paid</div>
+          </div>
+        )}
       </div>
 
-      {isOverpaid && (
-        <div className="rounded-lg border border-yellow-300 bg-yellow-50 px-4 py-3 text-sm text-yellow-800 dark:border-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-400">
-          Total payments ({formatPKR(totalReceived)}) exceed the predetermined amount ({formatPKR(predeterminedAmount)}).
-        </div>
-      )}
-
-      {/* Installment Schedule */}
+      {/* Schedule card */}
       {installments.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-8 text-center">
-          <p className="text-sm text-muted-foreground">
-            No installments set up for this season.
-          </p>
+        <div className="card card__pad text-center">
+          <p className="muted text-sm">No installments set up for this season.</p>
         </div>
       ) : (
-        <InstallmentSchedule
-          installments={installments}
-          seasonId={seasonId}
-          userId={user.id}
-        />
+        <div className="card card__pad">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <div>
+              <div className="card__title">Installment schedule</div>
+              <div className="card__sub">{installments.length} installments over the season</div>
+            </div>
+          </div>
+          <InstallmentSchedule installments={installments} seasonId={seasonId} userId={user.id} />
+        </div>
       )}
     </div>
   )

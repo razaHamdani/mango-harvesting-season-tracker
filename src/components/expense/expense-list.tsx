@@ -1,35 +1,27 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import Link from 'next/link'
-import { Trash2Icon } from 'lucide-react'
-import type { ExpenseWithFarm, ExpenseFilters } from '@/lib/queries/expense-queries'
+import { Zap, Sparkles, Leaf, User, Package, Trash2 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
+import type {
+  ExpenseWithFarm,
+  ExpenseFilters,
+} from '@/lib/queries/expense-queries'
 import { PhotoThumbnailClient } from '@/components/photo/photo-thumbnail-client'
 import { deleteExpense } from '@/lib/actions/expense-actions'
 import { loadMoreExpenses } from '@/lib/actions/list-actions'
 import { formatPKR, formatDate } from '@/lib/utils/format'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableFooter,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 
-const CATEGORY_STYLES: Record<string, string> = {
-  electricity:
-    'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
-  spray:
-    'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
-  fertilizer:
-    'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-  labor:
-    'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
-  misc: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400',
+const CATEGORY_META: Record<
+  string,
+  { icon: LucideIcon; cls: 'spray' | 'water' | 'fertilize' | 'harvest' | 'expense' }
+> = {
+  spray: { icon: Sparkles, cls: 'spray' },
+  fertilizer: { icon: Leaf, cls: 'fertilize' },
+  electricity: { icon: Zap, cls: 'water' },
+  labor: { icon: User, cls: 'harvest' },
+  misc: { icon: Package, cls: 'expense' },
 }
 
 interface ExpenseListProps {
@@ -37,8 +29,6 @@ interface ExpenseListProps {
   initialNextCursor: number | null
   seasonId: string
   filters: ExpenseFilters
-  totalAmount: number
-  totalLandlordCost: number
 }
 
 export function ExpenseList({
@@ -46,8 +36,6 @@ export function ExpenseList({
   initialNextCursor,
   seasonId,
   filters,
-  totalAmount,
-  totalLandlordCost,
 }: ExpenseListProps) {
   const [items, setItems] = useState(initialItems)
   const [cursor, setCursor] = useState(initialNextCursor)
@@ -68,7 +56,11 @@ export function ExpenseList({
   function handleLoadMore() {
     if (cursor === null) return
     startTransition(async () => {
-      const { items: more, nextCursor } = await loadMoreExpenses(seasonId, filters, cursor)
+      const { items: more, nextCursor } = await loadMoreExpenses(
+        seasonId,
+        filters,
+        cursor,
+      )
       setItems((prev) => [...prev, ...more])
       setCursor(nextCursor)
     })
@@ -76,94 +68,106 @@ export function ExpenseList({
 
   return (
     <>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Date</TableHead>
-            <TableHead>Category</TableHead>
-            <TableHead>Description</TableHead>
-            <TableHead>Activity</TableHead>
-            <TableHead className="text-right">Amount</TableHead>
-            <TableHead className="text-right">Landlord Cost</TableHead>
-            <TableHead>Farm / Worker</TableHead>
-            <TableHead className="w-10">Receipt</TableHead>
-            <TableHead className="w-10">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {items.map((expense) => (
-            <TableRow key={expense.id} id={`expense-${expense.id}`}>
-              <TableCell>{formatDate(expense.expense_date)}</TableCell>
-              <TableCell>
-                <Badge
-                  className={CATEGORY_STYLES[expense.category] ?? ''}
-                  variant="secondary"
+      <div className="card overflow-hidden">
+        <div className="list">
+          {items.map((expense) => {
+            const meta = CATEGORY_META[expense.category] ?? CATEGORY_META.misc
+            const Icon = meta.icon
+            const landlordCost = expense.landlord_cost
+            const contractorCost = Math.max(0, expense.amount - landlordCost)
+            const landlordPct =
+              expense.amount > 0
+                ? Math.round((landlordCost / expense.amount) * 100)
+                : 0
+            const target = expense.worker
+              ? expense.worker.name
+              : expense.farm_name ?? '—'
+            return (
+              <div
+                key={expense.id}
+                id={`expense-${expense.id}`}
+                className="activity-row group"
+                style={{
+                  gridTemplateColumns:
+                    '40px minmax(0,1fr) 180px 140px 48px 36px',
+                }}
+              >
+                <div
+                  className={`activity-icon ${meta.cls}`}
+                  aria-hidden="true"
                 >
-                  {expense.category}
-                </Badge>
-              </TableCell>
-              <TableCell>{expense.description ?? '-'}</TableCell>
-              <TableCell>
-                {expense.linked_activity ? (
-                  <Link
-                    href={`/seasons/${seasonId}/activities#activity-${expense.linked_activity.id}`}
-                    className="text-sm text-primary underline-offset-4 hover:underline"
-                  >
-                    {expense.linked_activity.type} · {formatDate(expense.linked_activity.activity_date)}
-                  </Link>
-                ) : (
-                  <span className="text-muted-foreground">—</span>
-                )}
-              </TableCell>
-              <TableCell className="text-right">
-                {formatPKR(expense.amount)}
-              </TableCell>
-              <TableCell className="text-right">
-                {formatPKR(expense.landlord_cost)}
-              </TableCell>
-              <TableCell>
-                {expense.worker
-                  ? <span className="text-sm font-medium">{expense.worker.name}</span>
-                  : (expense.farm_name ?? '-')}
-              </TableCell>
-              <TableCell>
-                {expense.photo_path && (
-                  <PhotoThumbnailClient path={expense.photo_path} alt="Receipt photo" />
-                )}
-              </TableCell>
-              <TableCell>
-                <Button
-                  variant="ghost"
-                  size="sm"
+                  <Icon className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <div className="activity-title truncate">
+                    {expense.description ?? expense.category}
+                  </div>
+                  <div className="activity-meta truncate">
+                    {expense.category[0].toUpperCase() +
+                      expense.category.slice(1)}{' '}
+                    · {target} · {formatDate(expense.expense_date)}
+                  </div>
+                </div>
+                <div className="split-cell">
+                  <div className="split-bar split-bar--prominent">
+                    <div
+                      className="seg-landlord"
+                      style={{ width: `${landlordPct}%` }}
+                    />
+                    <div
+                      className="seg-contractor"
+                      style={{ width: `${100 - landlordPct}%` }}
+                    />
+                  </div>
+                  <div className="split-cell__caption">
+                    <span className="mono tnum">{formatPKR(landlordCost)}</span>
+                    <span className="muted text-[10.5px]">L · C</span>
+                    <span className="mono tnum">
+                      {formatPKR(contractorCost)}
+                    </span>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="mono tnum text-[14px] font-semibold text-[color:var(--heading)]">
+                    {formatPKR(expense.amount)}
+                  </div>
+                  <div className="mt-0.5 text-[11px] text-[color:var(--text-muted)]">
+                    Landlord {landlordPct}%
+                  </div>
+                </div>
+                <div className="flex items-center justify-center">
+                  {expense.photo_path ? (
+                    <PhotoThumbnailClient
+                      path={expense.photo_path}
+                      alt="Receipt photo"
+                    />
+                  ) : (
+                    <div className="h-12 w-12" aria-hidden="true" />
+                  )}
+                </div>
+                <button
+                  type="button"
+                  className="icon-btn opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50"
                   disabled={isPending}
                   onClick={() => handleDelete(expense.id)}
-                  className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                  aria-label="Delete expense"
                 >
-                  <Trash2Icon className="h-4 w-4" />
-                </Button>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-        <TableFooter>
-          <TableRow>
-            <TableCell colSpan={4} className="font-medium">
-              Total
-            </TableCell>
-            <TableCell className="text-right font-medium">
-              {formatPKR(totalAmount)}
-            </TableCell>
-            <TableCell className="text-right font-medium">
-              {formatPKR(totalLandlordCost)}
-            </TableCell>
-            <TableCell colSpan={3} />
-          </TableRow>
-        </TableFooter>
-      </Table>
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )
+          })}
+        </div>
+      </div>
 
       {cursor !== null && (
         <div className="mt-4 flex justify-center">
-          <Button variant="outline" size="sm" disabled={isPending} onClick={handleLoadMore}>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={isPending}
+            onClick={handleLoadMore}
+          >
             {isPending ? 'Loading…' : 'Load more'}
           </Button>
         </div>

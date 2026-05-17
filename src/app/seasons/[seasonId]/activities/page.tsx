@@ -1,9 +1,11 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
+import { Sprout, Plus } from 'lucide-react'
 import { getActivities, getSeasonFarms } from '@/lib/queries/activity-queries'
 import { ActivityFilters } from '@/components/activity/activity-filters'
 import { ActivityList } from '@/components/activity/activity-list'
-import { Button } from '@/components/ui/button'
+import { EmptyState } from '@/components/shared/empty-state'
+import { buttonVariants } from '@/components/ui/button'
 
 export default async function ActivitiesPage({
   params,
@@ -22,33 +24,49 @@ export default async function ActivitiesPage({
     dateTo: typeof sp.dateTo === 'string' ? sp.dateTo : undefined,
   }
 
-  const [{ items: activities, nextCursor }, farms] = await Promise.all([
+  // Unfiltered fetch is reused as the chip count source.
+  const [{ items: activities, nextCursor }, farms, all] = await Promise.all([
     getActivities(seasonId, filters),
     getSeasonFarms(seasonId),
+    getActivities(seasonId),
   ])
 
+  const counts: Record<string, number> = {}
+  for (const a of all.items) counts[a.type] = (counts[a.type] ?? 0) + 1
+
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Activities</h2>
-        <Button size="sm" render={<Link href={`/seasons/${seasonId}/activities/new`} />}>
-          Log Activity
-        </Button>
+        <h2 className="text-xl font-semibold tracking-tight text-[color:var(--heading)]">
+          Activities
+        </h2>
+        <Link
+          href={`/seasons/${seasonId}/activities/new`}
+          className={buttonVariants({ size: 'sm' })}
+        >
+          <Plus className="h-4 w-4" />
+          Add activity
+        </Link>
       </div>
 
       <Suspense>
-        <ActivityFilters farms={farms} />
+        <ActivityFilters farms={farms} counts={counts} />
       </Suspense>
 
       {activities.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-8 text-center">
-          <p className="text-sm text-muted-foreground">
-            No activities logged yet.
-          </p>
-          <Button variant="link" size="sm" className="mt-2" render={<Link href={`/seasons/${seasonId}/activities/new`} />}>
-            Log your first activity
-          </Button>
-        </div>
+        <EmptyState
+          icon={<Sprout />}
+          title="No activities logged yet"
+          description="Track sprays, water, fertilizer and harvest as the season progresses."
+          action={
+            <Link
+              href={`/seasons/${seasonId}/activities/new`}
+              className={buttonVariants({ size: 'sm' })}
+            >
+              Log first activity
+            </Link>
+          }
+        />
       ) : (
         <ActivityList
           key={JSON.stringify(filters)}

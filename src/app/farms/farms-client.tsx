@@ -14,14 +14,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
+import { Home, Trash2 } from 'lucide-react'
 
 interface FarmsClientProps {
   farms: Farm[]
@@ -66,12 +59,10 @@ export function FarmsClient({ farms }: FarmsClientProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between" style={{marginBottom:24}}>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Farms</h1>
-          <p className="text-sm text-muted-foreground">
-            Manage your mango farms
-          </p>
+          <h1 style={{fontSize:24,color:'var(--heading)',fontWeight:600,letterSpacing:'-0.02em'}}>Farms</h1>
+          <div className="muted t-14 mt-1">{farms.length} farms · {farms.reduce((a,f) => a + f.acreage, 0).toFixed(2)} total acres</div>
         </div>
         <Dialog
           open={formOpen}
@@ -106,41 +97,29 @@ export function FarmsClient({ farms }: FarmsClientProps) {
           </p>
         </div>
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Acreage</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {farms.map((farm) => (
-              <TableRow key={farm.id}>
-                <TableCell className="font-medium">{farm.name}</TableCell>
-                <TableCell>{farm.acreage.toFixed(2)} acres</TableCell>
-                <TableCell className="text-right">
-                  <div className="flex justify-end gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleEditClick(farm)}
-                    >
-                      Edit
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => handleDeleteClick(farm)}
-                    >
-                      Delete
-                    </Button>
+        <div className="card overflow-hidden">
+          <div className="list">
+            {farms.map((farm, i) => (
+              <div key={farm.id} style={{padding:'18px 24px', borderTop: i === 0 ? '0' : '1px solid var(--border)', display:'flex', alignItems:'center', justifyContent:'space-between'}}>
+                <div style={{display:'flex', alignItems:'center', gap:14}}>
+                  <div style={{width:40,height:40,borderRadius:8,background:'var(--leaf-soft)',display:'grid',placeItems:'center',color:'oklch(0.35 0.13 145)',flexShrink:0}}>
+                    <Home className="h-[18px] w-[18px]" />
                   </div>
-                </TableCell>
-              </TableRow>
+                  <div>
+                    <div style={{fontWeight:500,color:'var(--heading)'}}>{farm.name}</div>
+                    <div className="t-12 muted mt-1">{farm.acreage.toFixed(2)} acres</div>
+                  </div>
+                </div>
+                <div style={{display:'flex',alignItems:'center',gap:8}}>
+                  <Button variant="ghost" size="sm" onClick={() => handleEditClick(farm)}>Edit</Button>
+                  <button className="icon-btn" onClick={() => handleDeleteClick(farm)} aria-label="Delete farm">
+                    <Trash2 className="h-[14px] w-[14px]" />
+                  </button>
+                </div>
+              </div>
             ))}
-          </TableBody>
-        </Table>
+          </div>
+        </div>
       )}
 
       <Dialog

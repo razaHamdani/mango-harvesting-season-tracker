@@ -3,16 +3,29 @@
 import * as React from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { MenuIcon, XIcon } from 'lucide-react'
+import {
+  LayoutDashboard,
+  Sprout,
+  Home,
+  Users,
+  LogOut,
+  Menu,
+  X,
+} from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
 
-const navItems = [
-  { label: 'Dashboard', href: '/dashboard' },
-  { label: 'Seasons', href: '/seasons' },
-  { label: 'Farms', href: '/farms' },
-  { label: 'Workers', href: '/workers' },
+type NavItem = {
+  label: string
+  href: string
+  Icon: React.ComponentType<{ size?: number }>
+}
+
+const navItems: NavItem[] = [
+  { label: 'Dashboard', href: '/dashboard', Icon: LayoutDashboard },
+  { label: 'Seasons', href: '/seasons', Icon: Sprout },
+  { label: 'Farms', href: '/farms', Icon: Home },
+  { label: 'Workers', href: '/workers', Icon: Users },
 ]
 
 export function MobileNav() {
@@ -39,7 +52,7 @@ export function MobileNav() {
         onClick={() => setOpen(true)}
         aria-label="Open menu"
       >
-        <MenuIcon />
+        <Menu />
       </Button>
 
       {open && (
@@ -48,48 +61,101 @@ export function MobileNav() {
             className="absolute inset-0 bg-black/40"
             onClick={() => setOpen(false)}
           />
-          <div className="absolute inset-y-0 left-0 flex w-64 flex-col bg-zinc-950 text-zinc-100 shadow-xl">
-            <div className="flex h-14 items-center justify-between px-5">
-              <span className="text-lg font-bold tracking-tight">AamDaata</span>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => setOpen(false)}
-                className="text-zinc-300 hover:bg-zinc-900"
-                aria-label="Close menu"
+          <div
+            className="absolute inset-y-0 left-0 flex w-64 flex-col shadow-xl"
+            style={{
+              background: 'var(--bark)',
+              color: 'oklch(0.92 0.02 80)',
+            }}
+          >
+            <div
+              className="flex items-center justify-between"
+              style={{ padding: '14px 16px 12px' }}
+            >
+              <span
+                style={{
+                  fontWeight: 600,
+                  fontSize: 16,
+                  letterSpacing: '-0.02em',
+                  color: 'var(--cream)',
+                }}
               >
-                <XIcon />
-              </Button>
+                AamDaata
+              </span>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                aria-label="Close menu"
+                className="inline-flex items-center justify-center rounded-md"
+                style={{
+                  width: 28,
+                  height: 28,
+                  color: 'oklch(0.78 0.02 70)',
+                }}
+              >
+                <X size={16} />
+              </button>
             </div>
-            <nav className="flex-1 space-y-1 px-3 py-2">
+            <nav className="flex-1" style={{ padding: '6px 10px' }}>
               {navItems.map((item) => {
                 const isActive =
                   pathname === item.href ||
                   pathname.startsWith(item.href + '/')
+                const Icon = item.Icon
                 return (
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={cn(
-                      'block rounded-md px-3 py-2 text-sm font-medium',
-                      isActive
-                        ? 'bg-zinc-800 text-white'
-                        : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100'
-                    )}
+                    className="flex items-center transition-colors"
+                    style={{
+                      gap: 11,
+                      padding: '9px 10px',
+                      borderRadius: 8,
+                      fontSize: '13.5px',
+                      color: isActive ? 'var(--cream)' : 'oklch(0.78 0.02 70)',
+                      background: isActive ? 'oklch(1 0 0 / 6%)' : 'transparent',
+                      boxShadow: isActive
+                        ? 'inset 2px 0 0 var(--mango)'
+                        : 'none',
+                    }}
                   >
-                    {item.label}
+                    <span
+                      style={{
+                        color: isActive
+                          ? 'var(--mango)'
+                          : 'oklch(0.72 0.06 75)',
+                        display: 'inline-flex',
+                      }}
+                    >
+                      <Icon size={16} />
+                    </span>
+                    <span>{item.label}</span>
                   </Link>
                 )
               })}
             </nav>
-            <div className="border-t border-zinc-800 px-3 py-3">
-              <Button
-                variant="ghost"
-                className="w-full justify-start text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100"
+            <div
+              style={{
+                padding: '12px 14px 16px',
+                borderTop: '1px solid oklch(1 0 0 / 6%)',
+              }}
+            >
+              <button
+                type="button"
                 onClick={handleSignOut}
+                className="inline-flex w-full items-center transition-colors"
+                style={{
+                  gap: 11,
+                  padding: '9px 10px',
+                  borderRadius: 8,
+                  fontSize: '13.5px',
+                  color: 'oklch(0.78 0.02 70)',
+                  background: 'transparent',
+                }}
               >
-                Sign out
-              </Button>
+                <LogOut size={16} />
+                <span>Sign out</span>
+              </button>
             </div>
           </div>
         </div>
