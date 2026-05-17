@@ -383,6 +383,46 @@
 .muted { color: var(--text-muted); }
 .faint { color: var(--text-faint); }
 
+/* Card */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow);
+}
+.card__pad { padding: 24px; }
+.card__pad-sm { padding: 18px 20px; }
+.card__head {
+  padding: 18px 24px 0;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px;
+}
+.card__title { font-size: 15px; font-weight: 600; color: var(--heading); }
+.card__sub { font-size: 12.5px; color: var(--text-muted); margin-top: 2px; }
+
+/* Section label */
+.section-label {
+  font-size: 11px; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.08em; font-weight: 500;
+}
+
+/* Dropzone */
+.dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px 16px;
+  border: 1.5px dashed var(--border-strong);
+  border-radius: var(--radius-card);
+  text-align: center;
+  transition: border-color var(--t-fast);
+}
+.dropzone:hover {
+  border-color: var(--mango);
+}
+
 /* Animation keyframes */
 @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
 @keyframes pop {

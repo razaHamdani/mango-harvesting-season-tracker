@@ -11,8 +11,10 @@ import { SummaryCards } from '@/components/insights/summary-cards'
 import { ExpenseBreakdownChart } from '@/components/insights/expense-breakdown-chart'
 import { PerAcreMetrics } from '@/components/insights/per-acre-metrics'
 import { SeasonComparison } from '@/components/insights/season-comparison'
+import { NetProfitGauge } from '@/components/insights/net-profit-gauge'
 import { SeasonActionButtons } from '@/components/season/season-action-buttons'
 import { PrintButton } from '@/components/insights/print-button'
+import { formatPKR } from '@/lib/utils/format'
 
 export default async function SeasonInsightsPage({
   params,
@@ -80,9 +82,33 @@ export default async function SeasonInsightsPage({
 
       <SummaryCards view={view} />
 
+      <PerAcreMetrics view={view} />
+
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.3fr) minmax(0,1fr)', gap: 24 }}>
         <ExpenseBreakdownChart expensesByCategory={view.expensesByCategory} />
-        <PerAcreMetrics view={view} />
+
+        {/* Net profit card */}
+        <div className="card card__pad">
+          <div className="card__title">Net profit</div>
+          <div className="card__sub mb-4">Revenue − landlord expenses</div>
+          <NetProfitGauge revenue={view.totalPaymentsReceived} expenses={view.totalExpenses} />
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 14, marginTop: 24, paddingTop: 18, borderTop: '1px solid var(--border)' }}>
+            <div>
+              <div className="section-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ width: 8, height: 8, borderRadius: 999, background: 'var(--mango)', display: 'inline-block' }} />
+                Revenue
+              </div>
+              <div className="mono" style={{ fontSize: 15, fontWeight: 600, marginTop: 4, color: 'var(--heading)' }}>{formatPKR(view.totalPaymentsReceived)}</div>
+            </div>
+            <div>
+              <div className="section-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ width: 8, height: 8, borderRadius: 999, background: 'var(--rust)', display: 'inline-block' }} />
+                Expenses
+              </div>
+              <div className="mono" style={{ fontSize: 15, fontWeight: 600, marginTop: 4, color: 'var(--heading)' }}>{formatPKR(view.totalExpenses)}</div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <SeasonComparison

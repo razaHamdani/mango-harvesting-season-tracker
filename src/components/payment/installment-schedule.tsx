@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { PaymentForm } from '@/components/payment/payment-form'
 import { formatPKR } from '@/lib/utils/format'
+import { PhotoThumbnailClient } from '@/components/photo/photo-thumbnail-client'
 
 type Status = 'paid' | 'overdue' | 'current' | 'future'
 
@@ -80,22 +81,27 @@ export function InstallmentSchedule({
                   </div>
                 )}
               </div>
-              <div style={{ textAlign: 'right' }}>
-                <div
-                  className="mono"
-                  style={{
-                    fontSize: status === 'current' ? 20 : 16,
-                    fontWeight: 600,
-                    color: 'var(--heading)',
-                  }}
-                >
-                  {formatPKR(inst.expected_amount)}
-                </div>
-                {status === 'paid' && inst.paid_amount !== inst.expected_amount && (
-                  <div className="muted t-12 tnum" style={{ marginTop: 2 }}>
-                    Actual {formatPKR(inst.paid_amount!)}
-                  </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                {status === 'paid' && inst.receipt_photo_path && (
+                  <PhotoThumbnailClient path={inst.receipt_photo_path} alt={`Receipt — Installment #${inst.installment_number}`} />
                 )}
+                <div style={{ textAlign: 'right' }}>
+                  <div
+                    className="mono"
+                    style={{
+                      fontSize: status === 'current' ? 20 : 16,
+                      fontWeight: 600,
+                      color: 'var(--heading)',
+                    }}
+                  >
+                    {formatPKR(inst.expected_amount)}
+                  </div>
+                  {status === 'paid' && inst.paid_amount !== inst.expected_amount && (
+                    <div className="muted t-12 tnum" style={{ marginTop: 2 }}>
+                      Actual {formatPKR(inst.paid_amount!)}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )
