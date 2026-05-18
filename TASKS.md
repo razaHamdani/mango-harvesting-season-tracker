@@ -2,9 +2,11 @@
 
 ## Currently Working On
 
-Nothing — Phase 12 + Phase 12.1 hardening complete.
+Nothing — runtime test harness verified complete.
 
 ## Completed
+
+- [x] Runtime test harness (PLAN.md) — RC-2 TOCTOU (`payments.test.ts`), RC-1 atomicity (`seasons.test.ts`), PHOTO-1 namespace validation (`photos.test.ts`); all 3 scenarios implemented; 126 tests passing; tsc clean; verified 2026-05-18
 
 - [x] Phase 12.1: Post-review hardening — new migration `20260508120000_expenses_salary_full_landlord.sql` adds DB CHECK `(worker_id IS NULL OR landlord_cost = amount)`; schema.sql mirrored; `getWorkers()` adds explicit `owner_id` filter + user guard (defense-in-depth); `expense-list.tsx` footer colSpan fixed (3→4 / 4→3) for 9-column alignment; `assertWorkerOwned` distinguishes query errors from not-found (mirrors `assertFarmInSeason` pattern + logging); 4 new DB-level tests (embedded worker name, category CHECK, salary CHECK, ON DELETE SET NULL); 126 tests passing; tsc clean
 - [x] Phase 12: Worker salaries via labor category + worker FK — nullable `worker_id UUID` FK on `expenses` (ON DELETE SET NULL) with DB CHECK `(worker_id IS NULL OR category = 'labor')`; `assertWorkerOwned` guard in server action; `farm_id` forced null when worker linked; `get_season_insights` RPC gains `worker_salaries` CTE field (labor expenses with `worker_id IS NOT NULL`); `SeasonInsightsView` gains `workerSalaries` / `workerSalariesPerAcre`; PerAcreMetrics gains "Salaries / Acre" tile; ExpenseForm shows worker dropdown + auto-fills amount when `category = 'labor'`; ExpenseList shows worker name in Farm/Worker column; 5 new tests; 122 tests passing; tsc clean
