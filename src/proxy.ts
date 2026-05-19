@@ -68,12 +68,29 @@ export async function proxy(request: NextRequest) {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value),
+          // Merge refreshed tokens into the original Cookie header so server
+          // components receive the new tokens (not the expired originals).
+          // We parse requestHeaders directly — not request.cookies.getAll() —
+          // to avoid including any stale in-memory cookie state that could
+          // shadow the refreshed values or cause parse errors.
+          const existingCookie = requestHeaders.get('cookie') ?? ''
+          const cookieMap = new Map<string, string>()
+          for (const part of existingCookie.split(';')) {
+            const s = part.trim()
+            if (!s) continue
+            const eq = s.indexOf('=')
+            cookieMap.set(eq === -1 ? s : s.slice(0, eq), eq === -1 ? '' : s.slice(eq + 1))
+          }
+          for (const { name, value } of cookiesToSet) {
+            cookieMap.set(name, value)
+          }
+          const mergedHeaders = new Headers(requestHeaders)
+          mergedHeaders.set(
+            'cookie',
+            [...cookieMap.entries()].map(([k, v]) => `${k}=${v}`).join('; '),
           )
-          // Recreate the response preserving the modified request headers.
           supabaseResponse = NextResponse.next({
-            request: { headers: requestHeaders },
+            request: { headers: mergedHeaders },
           })
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options),

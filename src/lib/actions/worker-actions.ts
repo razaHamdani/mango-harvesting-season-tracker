@@ -29,6 +29,17 @@ export async function createWorker(formData: FormData) {
   const { allowed } = await enforceLimit(mutationLimiter, `user:${user.id}`, true)
   if (!allowed) return { error: { _form: ['Too many requests. Try again shortly.'] } }
 
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('id', user.id)
+    .single()
+
+  if (!profile) {
+    console.error('[createWorker] profile missing for user — signup trigger failed', { userId: user.id })
+    return { error: { _form: ['Account setup is incomplete. Please contact support.'] } }
+  }
+
   const { error } = await supabase.from('workers').insert({
     owner_id: user.id,
     name: parsed.data.name,

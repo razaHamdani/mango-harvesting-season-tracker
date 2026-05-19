@@ -206,7 +206,7 @@ export default function LoginPage() {
         <div className="flex flex-col items-center text-center gap-3">
           <BrandMark />
           <h1 className="h-1 mt-1">Welcome back</h1>
-          <p style={{ fontSize: 13, color: "var(--text-muted)" }}>
+          <p className="mt-1" style={{ fontSize: 13, color: "var(--text-muted)" }}>
             {isSignUp ? "Create your AamDaata account" : "Sign in to continue"}
           </p>
         </div>
@@ -318,13 +318,6 @@ export default function LoginPage() {
           )}
         </div>
 
-        {isLocalDev && (
-          <div className="mt-5 flex justify-center">
-            <span className="chip" style={{ fontSize: 11.5 }}>
-              Check Inbucket for emails
-            </span>
-          </div>
-        )}
       </div>
     </div>
   );

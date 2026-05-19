@@ -39,8 +39,8 @@ export const expenseSchema = z.object({
 export const seasonCreateSchema = z.object({
   year: z.coerce.number().int().min(2020).max(2100),
   contractor_name: z.string().min(1, 'Contractor name is required'),
-  contractor_phone: z.string().optional().or(z.literal('')),
-  contractor_cnic: z.string().optional().or(z.literal('')),
+  contractor_phone: z.string().regex(/^[\d\s\-]+$/, 'Phone must contain only digits').optional().or(z.literal('')),
+  contractor_cnic: z.string().regex(/^[\d\-]+$/, 'CNIC must contain only digits').optional().or(z.literal('')),
   predetermined_amount: z.coerce.number().positive('Amount must be greater than 0'),
   spray_landlord_pct: z.coerce.number().int().min(0).max(100),
   fertilizer_landlord_pct: z.coerce.number().int().min(0).max(100),
