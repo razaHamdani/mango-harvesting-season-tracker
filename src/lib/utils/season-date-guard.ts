@@ -40,5 +40,10 @@ export async function assertWithinSeasonWindow(
     }
   }
 
+  const today = new Date().toISOString().slice(0, 10)
+  if (date > today) {
+    return { ok: false, error: 'Date cannot be in the future.' }
+  }
+
   return { ok: true }
 }

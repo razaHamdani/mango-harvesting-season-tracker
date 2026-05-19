@@ -7,15 +7,6 @@ import { ensureProfile } from '@/lib/queries/profile-queries'
 import { mutationLimiter, enforceLimit } from '@/lib/utils/rate-limiter'
 
 export async function createFarm(formData: FormData) {
-  const parsed = farmSchema.safeParse({
-    name: formData.get('name'),
-    acreage: formData.get('acreage'),
-  })
-
-  if (!parsed.success) {
-    return { error: parsed.error.flatten().fieldErrors }
-  }
-
   const supabase = await createClient()
 
   const {
@@ -28,6 +19,15 @@ export async function createFarm(formData: FormData) {
 
   const { allowed: createAllowed } = await enforceLimit(mutationLimiter, `user:${user.id}`, true)
   if (!createAllowed) return { error: { _form: ['Too many requests. Try again shortly.'] } }
+
+  const parsed = farmSchema.safeParse({
+    name: formData.get('name'),
+    acreage: formData.get('acreage'),
+  })
+
+  if (!parsed.success) {
+    return { error: parsed.error.flatten().fieldErrors }
+  }
 
   await ensureProfile()
 

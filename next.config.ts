@@ -13,8 +13,7 @@ const nextConfig: NextConfig = {
       // (e.g. "aamdaata.example.com"); leave unset in dev (default same-origin
       // check still applies).
       allowedOrigins: [
-        // Always allow local dev. In production, also allow the deployed domain.
-        'localhost:3000',
+        ...(process.env.NODE_ENV !== 'production' ? ['localhost:3000'] : []),
         ...(process.env.NEXT_PUBLIC_PROD_DOMAIN
           ? [process.env.NEXT_PUBLIC_PROD_DOMAIN]
           : []),

@@ -6,16 +6,6 @@ import { workerSchema } from '@/lib/utils/validators'
 import { mutationLimiter, enforceLimit } from '@/lib/utils/rate-limiter'
 
 export async function createWorker(formData: FormData) {
-  const parsed = workerSchema.safeParse({
-    name: formData.get('name'),
-    phone: formData.get('phone'),
-    monthly_salary: formData.get('monthly_salary'),
-  })
-
-  if (!parsed.success) {
-    return { error: parsed.error.flatten().fieldErrors }
-  }
-
   const supabase = await createClient()
 
   const {
@@ -28,6 +18,16 @@ export async function createWorker(formData: FormData) {
 
   const { allowed } = await enforceLimit(mutationLimiter, `user:${user.id}`, true)
   if (!allowed) return { error: { _form: ['Too many requests. Try again shortly.'] } }
+
+  const parsed = workerSchema.safeParse({
+    name: formData.get('name'),
+    phone: formData.get('phone'),
+    monthly_salary: formData.get('monthly_salary'),
+  })
+
+  if (!parsed.success) {
+    return { error: parsed.error.flatten().fieldErrors }
+  }
 
   const { data: profile } = await supabase
     .from('profiles')

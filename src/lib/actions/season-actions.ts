@@ -19,6 +19,19 @@ type SeasonInput = {
 }
 
 export async function createSeason(data: SeasonInput) {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { error: { _form: ['You must be logged in.'] } }
+  }
+
+  const { allowed } = await enforceLimit(mutationLimiter, `user:${user.id}`, true)
+  if (!allowed) return { error: { _form: ['Too many requests. Try again shortly.'] } }
+
   const parsed = seasonCreateSchema.safeParse(data)
 
   if (!parsed.success) {
@@ -39,19 +52,6 @@ export async function createSeason(data: SeasonInput) {
       },
     }
   }
-
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    return { error: { _form: ['You must be logged in.'] } }
-  }
-
-  const { allowed } = await enforceLimit(mutationLimiter, `user:${user.id}`, true)
-  if (!allowed) return { error: { _form: ['Too many requests. Try again shortly.'] } }
 
   // Atomic: single Postgres transaction via RPC. If anything fails
   // (unique-index violation, RLS denial, FK error), nothing is inserted --

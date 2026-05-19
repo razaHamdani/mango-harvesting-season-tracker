@@ -11,6 +11,19 @@ import { assertFarmInSeason } from '@/lib/utils/farm-season-guard'
 import { assertWorkerOwned } from '@/lib/utils/worker-guard'
 
 export async function createExpense(formData: FormData, seasonId: string) {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { error: 'You must be logged in.' }
+  }
+
+  const { allowed } = await enforceLimit(mutationLimiter, `user:${user.id}`, true)
+  if (!allowed) return { error: 'Too many requests. Try again shortly.' }
+
   const parsed = expenseSchema.safeParse({
     category: formData.get('category'),
     amount: formData.get('amount'),
@@ -24,19 +37,6 @@ export async function createExpense(formData: FormData, seasonId: string) {
   if (!parsed.success) {
     return { error: parsed.error.flatten().fieldErrors }
   }
-
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    return { error: 'You must be logged in.' }
-  }
-
-  const { allowed } = await enforceLimit(mutationLimiter, `user:${user.id}`, true)
-  if (!allowed) return { error: 'Too many requests. Try again shortly.' }
 
   // Fetch season for duty split config
   const { data: season, error: seasonError } = await supabase

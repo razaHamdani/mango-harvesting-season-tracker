@@ -111,7 +111,19 @@ export async function getActivities(
 }
 
 export async function getSeasonFarms(seasonId: string): Promise<Farm[]> {
+  const user = await getCurrentUser()
+  if (!user) return []
+
   const supabase = await createClient()
+
+  // Ownership pre-check: verify caller owns seasonId (defense-in-depth on top of RLS).
+  const { data: ownedSeason } = await supabase
+    .from('seasons')
+    .select('id')
+    .eq('id', seasonId)
+    .eq('owner_id', user.id)
+    .maybeSingle()
+  if (!ownedSeason) return []
 
   // Single round-trip via embedded join (was: season_farms query + farms query).
   const { data, error } = await supabase

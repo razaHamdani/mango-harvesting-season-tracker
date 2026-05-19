@@ -311,7 +311,7 @@ export default function LoginPage() {
               className="underline underline-offset-4 hover:text-foreground"
               style={{ fontSize: 12.5, color: "var(--text-muted)" }}
               onClick={handleResend}
-              disabled={resendLoading}
+              disabled={resendLoading || !email.trim()}
             >
               Resend confirmation
             </button>

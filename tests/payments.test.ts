@@ -6,6 +6,7 @@ import { recordPayment } from '@/lib/actions/payment-actions'
 
 describe('recordPayment — RC-2 TOCTOU', () => {
   const admin = createAdminClient()
+  const TODAY = new Date().toISOString().slice(0, 10)
   let user: TestUser
   let seasonId: string
   let installmentId: string
@@ -69,7 +70,7 @@ describe('recordPayment — RC-2 TOCTOU', () => {
     const mk = (amount: number) => {
       const fd = new FormData()
       fd.set('amount', String(amount))
-      fd.set('paid_date', '2026-05-20')
+      fd.set('paid_date', TODAY)
       fd.set('notes', `amount=${amount}`)
       return fd
     }
@@ -101,7 +102,7 @@ describe('recordPayment — RC-2 TOCTOU', () => {
   it('allows the legitimate owner to record payment', async () => {
     const fd = new FormData()
     fd.set('amount', '100000')
-    fd.set('paid_date', '2026-05-20')
+    fd.set('paid_date', TODAY)
     const result = await recordPayment(installmentId, fd, seasonId)
     expect('success' in result && result.success).toBe(true)
   })
@@ -110,7 +111,7 @@ describe('recordPayment — RC-2 TOCTOU', () => {
     const mk = (amount: number) => {
       const fd = new FormData()
       fd.set('amount', String(amount))
-      fd.set('paid_date', '2026-05-20')
+      fd.set('paid_date', TODAY)
       return fd
     }
 

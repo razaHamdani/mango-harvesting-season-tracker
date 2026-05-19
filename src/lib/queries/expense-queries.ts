@@ -108,6 +108,15 @@ export async function getExpenseTotals(
 
   const supabase = await createClient()
 
+  // Ownership pre-check: verify caller owns seasonId (defense-in-depth on top of RLS).
+  const { data: ownedSeason } = await supabase
+    .from('seasons')
+    .select('id')
+    .eq('id', seasonId)
+    .eq('owner_id', user.id)
+    .maybeSingle()
+  if (!ownedSeason) return { totalAmount: 0, totalLandlordCost: 0 }
+
   let query = supabase
     .from('expenses')
     .select('amount, landlord_cost')

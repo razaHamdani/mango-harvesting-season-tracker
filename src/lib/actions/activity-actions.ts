@@ -9,20 +9,6 @@ import { assertWithinSeasonWindow } from '@/lib/utils/season-date-guard'
 import { assertFarmInSeason } from '@/lib/utils/farm-season-guard'
 
 export async function createActivity(formData: FormData, seasonId: string) {
-  const parsed = activitySchema.safeParse({
-    type: formData.get('type'),
-    farm_id: formData.get('farm_id'),
-    activity_date: formData.get('activity_date'),
-    item_name: formData.get('item_name'),
-    meter_reading: formData.get('meter_reading') || undefined,
-    boxes_collected: formData.get('boxes_collected') || undefined,
-    description: formData.get('description'),
-  })
-
-  if (!parsed.success) {
-    return { error: parsed.error.flatten().fieldErrors }
-  }
-
   if (!seasonId) {
     return { error: 'Season ID is required.' }
   }
@@ -39,6 +25,20 @@ export async function createActivity(formData: FormData, seasonId: string) {
 
   const { allowed: createAllowed } = await enforceLimit(mutationLimiter, `user:${user.id}`, true)
   if (!createAllowed) return { error: 'Too many requests. Try again shortly.' }
+
+  const parsed = activitySchema.safeParse({
+    type: formData.get('type'),
+    farm_id: formData.get('farm_id'),
+    activity_date: formData.get('activity_date'),
+    item_name: formData.get('item_name'),
+    meter_reading: formData.get('meter_reading') || undefined,
+    boxes_collected: formData.get('boxes_collected') || undefined,
+    description: formData.get('description'),
+  })
+
+  if (!parsed.success) {
+    return { error: parsed.error.flatten().fieldErrors }
+  }
 
   // Ownership pre-check: verify the caller owns this season.
   const { data: ownedSeason } = await supabase

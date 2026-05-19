@@ -17,7 +17,10 @@ export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
   const token_hash = searchParams.get('token_hash')
   const type = searchParams.get('type') as 'signup' | 'recovery' | 'invite' | 'email' | null
-  const next = searchParams.get('next') ?? '/dashboard'
+  const rawNext = searchParams.get('next') ?? '/dashboard'
+  // Reject protocol-relative URLs (//evil.com) and absolute URLs — only allow
+  // relative paths starting with a single '/'.
+  const next = rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : '/dashboard'
 
   if (token_hash && type) {
     const cookieStore = await cookies()
