@@ -206,7 +206,7 @@ export default function LoginPage() {
         <div className="flex flex-col items-center text-center gap-3">
           <BrandMark />
           <h1 className="h-1 mt-1">Welcome back</h1>
-          <p className="mt-1" style={{ fontSize: 13, color: "var(--text-muted)" }}>
+          <p className="mt-3" style={{ fontSize: 13, color: "var(--text-muted)" }}>
             {isSignUp ? "Create your AamDaata account" : "Sign in to continue"}
           </p>
         </div>
@@ -305,17 +305,6 @@ export default function LoginPage() {
               ? "Already have an account? Log in"
               : "Don't have an account? Sign up"}
           </button>
-          {!isSignUp && (
-            <button
-              type="button"
-              className="underline underline-offset-4 hover:text-foreground"
-              style={{ fontSize: 12.5, color: "var(--text-muted)" }}
-              onClick={handleResend}
-              disabled={resendLoading || !email.trim()}
-            >
-              Resend confirmation
-            </button>
-          )}
         </div>
 
       </div>
