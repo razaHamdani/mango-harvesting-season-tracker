@@ -18,7 +18,9 @@ export function PerAcreMetrics({ view }: { view: SeasonInsightsView }) {
     { label: 'Total Cost / Acre', value: view.totalCostPerAcre },
     { label: 'Spray Cost / Acre', value: view.sprayCostPerAcre },
     { label: 'Electricity / Acre', value: view.electricityCostPerAcre },
-    { label: 'Salaries / Acre', value: view.workerSalariesPerAcre },
+    { label: 'Fertilizer Cost / Acre', value: view.fertilizerCostPerAcre },
+    { label: 'Labor Cost / Acre', value: view.laborCostPerAcre },
+    { label: 'Misc Cost / Acre', value: view.miscCostPerAcre },
   ]
 
   return (
@@ -31,7 +33,7 @@ export function PerAcreMetrics({ view }: { view: SeasonInsightsView }) {
           </div>
         </div>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,minmax(0,1fr))', gap: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 20 }}>
         {items.map((p) => (
           <div key={p.label} className="kpi">
             <div className="kpi__label">{p.label}</div>

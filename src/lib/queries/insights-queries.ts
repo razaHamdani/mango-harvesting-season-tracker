@@ -8,7 +8,6 @@ type RawInsights = {
   boxes_received: number
   total_expenses: number
   expenses_by_category: Record<string, number>
-  worker_salaries: number
   total_payments_received: number
   installments_paid: number
   installments_total: number
@@ -22,8 +21,6 @@ export type SeasonInsightsView = {
   boxesReceived: number
   totalExpenses: number
   expensesByCategory: Record<string, number>
-  workerSalaries: number
-  workerSalariesPerAcre: number
   totalPaymentsReceived: number
   installmentsPaid: number
   installmentsTotal: number
@@ -33,6 +30,9 @@ export type SeasonInsightsView = {
   revenuePerAcre: number
   sprayCostPerAcre: number
   electricityCostPerAcre: number
+  fertilizerCostPerAcre: number
+  laborCostPerAcre: number
+  miscCostPerAcre: number
 }
 
 function deriveMetrics(
@@ -51,8 +51,6 @@ function deriveMetrics(
     boxesReceived: raw.boxes_received,
     totalExpenses: raw.total_expenses,
     expensesByCategory: byCat,
-    workerSalaries: raw.worker_salaries ?? 0,
-    workerSalariesPerAcre: safe(raw.worker_salaries ?? 0),
     totalPaymentsReceived: raw.total_payments_received,
     installmentsPaid: raw.installments_paid,
     installmentsTotal: raw.installments_total,
@@ -61,6 +59,9 @@ function deriveMetrics(
     revenuePerAcre: safe(raw.predetermined_amount),
     sprayCostPerAcre: safe(byCat.spray ?? 0),
     electricityCostPerAcre: safe(byCat.electricity ?? 0),
+    fertilizerCostPerAcre: safe(byCat.fertilizer ?? 0),
+    laborCostPerAcre: safe(byCat.labor ?? 0),
+    miscCostPerAcre: safe(byCat.misc ?? 0),
   }
 }
 

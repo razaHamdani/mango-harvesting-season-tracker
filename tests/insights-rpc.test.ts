@@ -85,7 +85,7 @@ describe('get_season_insights — ownership guard', () => {
   })
 })
 
-describe('get_season_insights — worker_salaries (Phase 12)', () => {
+describe('get_season_insights — labor category folds in salaries + casual labor', () => {
   const admin = createAdminClient()
   let user: TestUser
   let seasonId: string
@@ -155,7 +155,7 @@ describe('get_season_insights — worker_salaries (Phase 12)', () => {
     if (user) await deleteTestUser(user.id)
   })
 
-  it('worker_salaries counts only labor expenses with worker_id set', async () => {
+  it('labor category total includes both salaried and casual labor; worker_salaries removed', async () => {
     const { data, error } = await user.client.rpc('get_season_insights', {
       p_season_id: seasonId,
     })
@@ -163,7 +163,11 @@ describe('get_season_insights — worker_salaries (Phase 12)', () => {
     expect(error).toBeNull()
     expect(data).toBeDefined()
     const obj = data as Record<string, unknown>
-    expect(Number(obj.worker_salaries)).toBe(20000)
+    // worker_salaries is no longer part of the contract.
+    expect(obj.worker_salaries).toBeUndefined()
+    // Labor category now folds in the salaried (20000) + casual (5000) expenses.
+    const byCat = obj.expenses_by_category as Record<string, number>
+    expect(Number(byCat.labor)).toBe(25000)
     expect(Number(obj.total_expenses)).toBe(25000)
   })
 })
