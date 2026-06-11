@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { logError } from '@/lib/utils/logger'
 
 export type WorkerGuard = { ok: true } | { ok: false; error: string }
 
@@ -19,7 +20,7 @@ export async function assertWorkerOwned(
     .maybeSingle()
 
   if (error) {
-    console.error('[assertWorkerOwned] query failed', error)
+    await logError('assertWorkerOwned.query', error)
     return { ok: false, error: 'Failed to verify worker. Please try again.' }
   }
   if (!data) return { ok: false, error: 'Selected worker not found.' }

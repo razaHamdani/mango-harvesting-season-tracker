@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { workerSchema } from '@/lib/utils/validators'
 import { mutationLimiter, enforceLimit } from '@/lib/utils/rate-limiter'
+import { logError } from '@/lib/utils/logger'
 
 export async function createWorker(formData: FormData) {
   const supabase = await createClient()
@@ -36,7 +37,7 @@ export async function createWorker(formData: FormData) {
     .single()
 
   if (!profile) {
-    console.error('[createWorker] profile missing for user — signup trigger failed', { userId: user.id })
+    await logError('createWorker.profileMissing', { userId: user.id, note: 'signup trigger failed' })
     return { error: { _form: ['Account setup is incomplete. Please contact support.'] } }
   }
 
@@ -48,7 +49,7 @@ export async function createWorker(formData: FormData) {
   })
 
   if (error) {
-    console.error('[createWorker] insert failed', error)
+    await logError('createWorker.insert', error)
     return { error: { _form: ['Failed to create worker.'] } }
   }
 
@@ -91,7 +92,7 @@ export async function updateWorker(id: string, formData: FormData) {
     .eq('owner_id', user.id)
 
   if (error) {
-    console.error('[updateWorker] update failed', error)
+    await logError('updateWorker.update', error)
     return { error: { _form: ['Failed to update worker.'] } }
   }
 
@@ -131,7 +132,7 @@ export async function toggleWorkerActive(id: string) {
     .eq('owner_id', user.id)
 
   if (error) {
-    console.error('[toggleWorkerActive] update failed', error)
+    await logError('toggleWorkerActive.update', error)
     return { error: { _form: ['Failed to update worker.'] } }
   }
 
@@ -160,7 +161,7 @@ export async function deleteWorker(id: string) {
     .eq('owner_id', user.id)
 
   if (error) {
-    console.error('[deleteWorker] delete failed', error)
+    await logError('deleteWorker.delete', error)
     return { error: { _form: ['Failed to delete worker.'] } }
   }
 

@@ -3,6 +3,7 @@ import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { Database } from '@/types/database'
+import { logError } from '@/lib/utils/logger'
 
 /**
  * Auth callback handler — exchanges the token_hash from Supabase's email
@@ -49,7 +50,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(`${origin}${next}`)
     }
 
-    console.error('[auth/callback] verifyOtp failed', error.message)
+    await logError('authCallback.verifyOtp', error.message)
   }
 
   // Expired or invalid link — send back to login with a visible error.

@@ -6,6 +6,7 @@ import { validatePhotoPath } from '@/lib/utils/validate-photo-path'
 import { mutationLimiter, enforceLimit } from '@/lib/utils/rate-limiter'
 import { assertWithinSeasonWindow } from '@/lib/utils/season-date-guard'
 import { paymentSchema } from '@/lib/utils/validators'
+import { logError } from '@/lib/utils/logger'
 
 export async function recordPayment(
   installmentId: string,
@@ -74,7 +75,7 @@ export async function recordPayment(
     .select('id')
 
   if (updateError) {
-    console.error('[recordPayment] update failed', updateError)
+    await logError('recordPayment.update', updateError)
     return { error: 'Failed to record payment.' }
   }
 

@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { logError } from '@/lib/utils/logger'
 
 export type FarmGuard = { ok: true } | { ok: false; error: string }
 
@@ -19,7 +20,7 @@ export async function assertFarmInSeason(
     .maybeSingle()
 
   if (error) {
-    console.error('[assertFarmInSeason] query failed', error)
+    await logError('assertFarmInSeason.query', error)
     return { ok: false, error: 'Could not verify farm enrollment. Please try again.' }
   }
   if (!data) return { ok: false, error: 'Selected farm is not part of this season.' }

@@ -1,4 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js'
+import { logError } from '@/lib/utils/logger'
 
 const BUCKET = 'aam-daata-photos'
 
@@ -23,7 +24,7 @@ export async function getPhotoUrl(
     .createSignedUrl(path, expiresIn)
 
   if (error) {
-    console.error('Failed to get photo URL:', error.message)
+    await logError('getPhotoUrl.signedUrl', error.message)
     return null
   }
 

@@ -7,6 +7,7 @@ import { validatePhotoPath } from '@/lib/utils/validate-photo-path'
 import { mutationLimiter, enforceLimit } from '@/lib/utils/rate-limiter'
 import { assertWithinSeasonWindow } from '@/lib/utils/season-date-guard'
 import { assertFarmInSeason } from '@/lib/utils/farm-season-guard'
+import { logError } from '@/lib/utils/logger'
 
 export async function createActivity(formData: FormData, seasonId: string) {
   if (!seasonId) {
@@ -84,7 +85,7 @@ export async function createActivity(formData: FormData, seasonId: string) {
     .single()
 
   if (insertError || !activity) {
-    console.error('[createActivity] insert failed', insertError)
+    await logError('createActivity.insert', insertError)
     return { error: 'Failed to create activity.' }
   }
 
@@ -141,7 +142,7 @@ export async function deleteActivity(activityId: string, seasonId: string) {
     .eq('season_id', seasonId)
 
   if (error) {
-    console.error('[deleteActivity] delete failed', error)
+    await logError('deleteActivity.delete', error)
     return { error: 'Failed to delete activity.' }
   }
 
@@ -152,7 +153,7 @@ export async function deleteActivity(activityId: string, seasonId: string) {
       .from('aam-daata-photos')
       .remove([ownedActivity.photo_path])
     if (storageErr) {
-      console.error('[deleteActivity] storage cleanup failed', storageErr)
+      await logError('deleteActivity.storageCleanup', storageErr)
     }
   }
 

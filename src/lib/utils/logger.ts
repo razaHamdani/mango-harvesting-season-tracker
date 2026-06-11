@@ -9,8 +9,8 @@ import { headers } from 'next/headers'
  *   - any Server Action logs raised during that request
  *   - the response headers (x-request-id) the user can copy from devtools
  *
- * Sentry (configured in sentry.server.config.ts) captures the err separately
- * via console.error interception.
+ * Sentry (configured in sentry.server.config.ts) promotes this console.error
+ * line to an event via captureConsoleIntegration.
  *
  * Usage:
  *   await logError('createExpense', err)

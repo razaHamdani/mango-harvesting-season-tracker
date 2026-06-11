@@ -2,9 +2,11 @@
 
 ## Currently Working On
 
-Nothing — runtime test harness verified complete.
+Production blockers C1–C4 (PLAN.md approved 2026-06-11) — B1 complete, next: Phase B2 (z.iso.date() on the four date fields).
 
 ## Completed
+
+- [x] Phase B1 (C1 observability) — `captureConsoleIntegration({ levels: ['error'] })` added to sentry.server.config.ts + sentry.edge.config.ts (export verified in installed @sentry/node and @sentry/vercel-edge); false "console.error is captured" comments fixed; all 24 server-side `console.error` sites in actions, guards, photo util, and auth callback route swept to `logError(scope, err)` with dotted scopes (`action.step`); remaining console.error sites are intentional (rate-limiter module scope, client error boundary, logger itself); 5 new tests (tests/logger.test.ts, tests/sentry-config.test.ts); 131 tests passing; tsc clean
 
 - [x] Runtime test harness (PLAN.md) — RC-2 TOCTOU (`payments.test.ts`), RC-1 atomicity (`seasons.test.ts`), PHOTO-1 namespace validation (`photos.test.ts`); all 3 scenarios implemented; 126 tests passing; tsc clean; verified 2026-05-18
 
@@ -84,6 +86,9 @@ Nothing — runtime test harness verified complete.
 - 2026-04-28: Phase 6D.4 (audit log UI) deferred per plan — wait for real data before designing the activity history page.
 
 ## Decisions & Deviations
+
+- 2026-06-11: C3 fix uses `z.iso.date()` (Zod v4) over `z.coerce.date()` — coerce accepts the unpadded-date bypass input and mixes local/UTC parsing; iso.date enforces strict YYYY-MM-DD + calendar validity, strings end-to-end.
+- 2026-06-11: C4 "today" anchored to `APP_TIMEZONE` env (default Asia/Karachi), user-confirmed — dates record farm events, so farm timezone is the anchor; viewer-timezone and UTC+grace alternatives rejected.
 
 - 2026-04-17: seasons test covers 3 scenarios: bad sum (app-level early exit), valid creation (all 3 tables populated), FK violation (RPC rollback). No mocking of DB errors needed — passing bogus farm UUID triggers real FK constraint.
 - 2026-04-17: photos test uses `createActivity` (not expense/payment) since activity-actions has the cleanest photo_path validation to test; the validation pattern is identical across all three action files.

@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { farmSchema } from '@/lib/utils/validators'
 import { ensureProfile } from '@/lib/queries/profile-queries'
 import { mutationLimiter, enforceLimit } from '@/lib/utils/rate-limiter'
+import { logError } from '@/lib/utils/logger'
 
 export async function createFarm(formData: FormData) {
   const supabase = await createClient()
@@ -38,7 +39,7 @@ export async function createFarm(formData: FormData) {
   })
 
   if (error) {
-    console.error('[createFarm] insert failed', error)
+    await logError('createFarm.insert', error)
     return { error: { _form: ['Failed to create farm.'] } }
   }
 
@@ -79,7 +80,7 @@ export async function updateFarm(id: string, formData: FormData) {
     .eq('owner_id', user.id)
 
   if (error) {
-    console.error('[updateFarm] update failed', error)
+    await logError('updateFarm.update', error)
     return { error: { _form: ['Failed to update farm.'] } }
   }
 
@@ -108,7 +109,7 @@ export async function deleteFarm(id: string) {
     .eq('owner_id', user.id)
 
   if (error) {
-    console.error('[deleteFarm] delete failed', error)
+    await logError('deleteFarm.delete', error)
     return { error: { _form: ['Failed to delete farm.'] } }
   }
 

@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { seasonCreateSchema } from '@/lib/utils/validators'
 import { mutationLimiter, enforceLimit } from '@/lib/utils/rate-limiter'
+import { logError } from '@/lib/utils/logger'
 
 type SeasonInput = {
   year: number
@@ -83,7 +84,7 @@ export async function createSeason(data: SeasonInput) {
         },
       }
     }
-    console.error('[createSeason] RPC error', rpcError)
+    await logError('createSeason.rpc', rpcError)
     return { error: { _form: ['Failed to create season.'] } }
   }
 
@@ -142,7 +143,7 @@ export async function deleteSeason(id: string) {
     .eq('owner_id', user.id)
 
   if (error) {
-    console.error('[deleteSeason] delete failed', error)
+    await logError('deleteSeason.delete', error)
     return { error: { _form: ['Failed to delete season.'] } }
   }
 
@@ -152,7 +153,7 @@ export async function deleteSeason(id: string) {
       .from('aam-daata-photos')
       .remove(photoPaths)
     if (storageErr) {
-      console.error('[deleteSeason] storage cleanup failed', storageErr)
+      await logError('deleteSeason.storageCleanup', storageErr)
     }
   }
 
@@ -212,7 +213,7 @@ export async function activateSeason(id: string) {
   }
 
   if (error) {
-    console.error('[activateSeason] update failed', error)
+    await logError('activateSeason.update', error)
     return { error: { _form: ['Failed to activate season.'] } }
   }
 
@@ -266,7 +267,7 @@ export async function closeSeason(id: string) {
     .eq('owner_id', user.id)
 
   if (error) {
-    console.error('[closeSeason] update failed', error)
+    await logError('closeSeason.update', error)
     return { error: { _form: ['Failed to close season.'] } }
   }
 

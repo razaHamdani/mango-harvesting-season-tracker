@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { authLimiter, enforceLimit } from '@/lib/utils/rate-limiter'
 import { getClientIpFromHeaders } from '@/lib/utils/client-ip'
 import { EMAIL_RE, hasMxRecords } from '@/lib/utils/email-validation'
+import { logError } from '@/lib/utils/logger'
 
 const ALLOWED_ROLES = ['landlord'] as const
 type AllowedRole = typeof ALLOWED_ROLES[number]
@@ -30,7 +31,7 @@ export async function signInUser(
   })
 
   if (error) {
-    console.error('[signInUser] auth error', error.message)
+    await logError('signInUser.auth', error.message)
     return { error: 'Invalid email or password.' }
   }
   return {}
@@ -66,7 +67,7 @@ export async function signUpUser(
   // do not proceed to signUp (unknown state is worse than a retry prompt).
   const { data: exists, error: rpcError } = await supabase.rpc('email_exists', { check_email: email })
   if (rpcError) {
-    console.error('[signUpUser] email_exists rpc error', rpcError.message)
+    await logError('signUpUser.emailExistsRpc', rpcError.message)
     return { error: 'Something went wrong, please try again.' }
   }
   if (exists === true) {
@@ -85,7 +86,7 @@ export async function signUpUser(
   })
 
   if (error) {
-    console.error('[signUpUser] auth error', error.message)
+    await logError('signUpUser.auth', error.message)
     return { error: 'Failed to create account.' }
   }
 
@@ -111,7 +112,7 @@ export async function resendConfirmation(
   // This prevents email enumeration (Supabase's resend response differs for known vs unknown emails).
   const { error } = await supabase.auth.resend({ type: 'signup', email })
   if (error) {
-    console.error('[resendConfirmation] error', error.message)
+    await logError('resendConfirmation.resend', error.message)
   }
   return { ok: true }
 }

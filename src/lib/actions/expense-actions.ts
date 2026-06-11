@@ -9,6 +9,7 @@ import { mutationLimiter, enforceLimit } from '@/lib/utils/rate-limiter'
 import { assertWithinSeasonWindow } from '@/lib/utils/season-date-guard'
 import { assertFarmInSeason } from '@/lib/utils/farm-season-guard'
 import { assertWorkerOwned } from '@/lib/utils/worker-guard'
+import { logError } from '@/lib/utils/logger'
 
 export async function createExpense(formData: FormData, seasonId: string) {
   const supabase = await createClient()
@@ -121,7 +122,7 @@ export async function createExpense(formData: FormData, seasonId: string) {
     .single()
 
   if (insertError || !expense) {
-    console.error('[createExpense] insert failed', insertError)
+    await logError('createExpense.insert', insertError)
     return { error: 'Failed to create expense.' }
   }
 
@@ -179,7 +180,7 @@ export async function deleteExpense(expenseId: string, seasonId: string) {
     .eq('season_id', seasonId)
 
   if (error) {
-    console.error('[deleteExpense] delete failed', error)
+    await logError('deleteExpense.delete', error)
     return { error: 'Failed to delete expense.' }
   }
 
@@ -190,7 +191,7 @@ export async function deleteExpense(expenseId: string, seasonId: string) {
       .from('aam-daata-photos')
       .remove([ownedExpense.photo_path])
     if (storageErr) {
-      console.error('[deleteExpense] storage cleanup failed', storageErr)
+      await logError('deleteExpense.storageCleanup', storageErr)
     }
   }
 
