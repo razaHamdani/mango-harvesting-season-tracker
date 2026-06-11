@@ -150,13 +150,20 @@ export async function deleteExpense(expenseId: string, seasonId: string) {
   // Prevents: user B supplies their own valid seasonId paired with user A's expenseId.
   const { data: ownedSeason } = await supabase
     .from('seasons')
-    .select('id')
+    .select('id, status')
     .eq('id', seasonId)
     .eq('owner_id', user.id)
     .maybeSingle()
 
   if (!ownedSeason) {
     return { error: 'Expense not found.' }
+  }
+
+  // Closed seasons are the financial record of the contract — deleting from
+  // them would silently alter history. Creates are already blocked by
+  // assertWithinSeasonWindow; this is the delete-side counterpart.
+  if (ownedSeason.status === 'closed') {
+    return { error: 'Records of a closed season cannot be deleted.' }
   }
 
   // Step 2 — verify the expense actually belongs to that season AND grab
