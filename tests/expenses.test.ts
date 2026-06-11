@@ -1046,3 +1046,87 @@ describe('expenses worker ON DELETE SET NULL (Phase 12.1C)', () => {
     expect(Number(row!.amount)).toBe(10_000)
   })
 })
+
+/**
+ * Phase B2 — strict YYYY-MM-DD date validation (z.iso.date()).
+ *
+ * The season window guard compares dates lexicographically, which is only
+ * safe for zero-padded ISO dates. An unpadded date like '2026-06-1' used to
+ * pass both the start check ('2026-06-1' > '2026-06-05' lexicographically)
+ * and the future check, yet Postgres parses it as 2026-06-01 — BEFORE the
+ * season start. Validation must reject it before the guard ever runs.
+ */
+describe('createExpense — date format hardening (B2)', () => {
+  const admin = createAdminClient()
+  let user: TestUser
+  let seasonId: string
+
+  beforeAll(async () => {
+    await resetDb(admin)
+    user = await createTestUser('exp-date-format')
+
+    // started_at chosen so the unpadded bypass date sorts AFTER it
+    // lexicographically while being chronologically before it.
+    const { data: season } = await admin
+      .from('seasons')
+      .insert({
+        owner_id: user.id,
+        year: 2026,
+        status: 'active',
+        started_at: '2026-06-05',
+        contractor_name: 'Format C',
+        predetermined_amount: 50_000,
+        spray_landlord_pct: 50,
+        fertilizer_landlord_pct: 50,
+        agreed_boxes: 0,
+      })
+      .select('id').single()
+    if (!season) throw new Error('season seed failed')
+    seasonId = season.id
+  })
+
+  afterAll(async () => {
+    clearCurrentClient()
+    if (user) await deleteTestUser(user.id)
+  })
+
+  function makeFormData(expenseDate: string) {
+    const fd = new FormData()
+    fd.set('category', 'misc')
+    fd.set('amount', '500')
+    fd.set('expense_date', expenseDate)
+    fd.set('farm_id', '')
+    fd.set('description', 'format test')
+    return fd
+  }
+
+  it('rejects the unpadded-date window bypass and inserts nothing', async () => {
+    setCurrentClient(user.client)
+    const result = await createExpense(makeFormData('2026-06-1'), seasonId)
+
+    expect(result).toHaveProperty('error')
+    const err = (result as { error: Record<string, string[]> }).error
+    expect(err.expense_date?.[0]).toMatch(/valid date/i)
+
+    const { count } = await admin
+      .from('expenses')
+      .select('id', { count: 'exact', head: true })
+      .eq('season_id', seasonId)
+    expect(count).toBe(0)
+  })
+
+  it('rejects a calendar-invalid date (2026-02-30)', async () => {
+    setCurrentClient(user.client)
+    const result = await createExpense(makeFormData('2026-02-30'), seasonId)
+
+    expect(result).toHaveProperty('error')
+    const err = (result as { error: Record<string, string[]> }).error
+    expect(err.expense_date?.[0]).toMatch(/valid date/i)
+  })
+
+  it('still accepts a well-formed in-window date', async () => {
+    setCurrentClient(user.client)
+    const result = await createExpense(makeFormData('2026-06-06'), seasonId)
+    expect(result).toMatchObject({ success: true })
+  })
+})

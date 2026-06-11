@@ -2,10 +2,11 @@
 
 ## Currently Working On
 
-Production blockers C1–C4 (PLAN.md approved 2026-06-11) — B1 complete, next: Phase B2 (z.iso.date() on the four date fields).
+Production blockers C1–C4 (PLAN.md approved 2026-06-11) — B1, B2 complete; next: Phase B3 (APP_TIMEZONE "today" helper).
 
 ## Completed
 
+- [x] Phase B2 (C3 date hardening) — `z.iso.date()` replaces `z.string().min(1)` on `due_date`, `activity_date`, `expense_date`, `paid_date` in validators.ts; closes the unpadded-date window bypass ('2026-06-1' sorted after '2026-06-05' lexicographically but parses to June 1) and rejects calendar-invalid dates; 5 new tests (bypass + no-insert, 2026-02-30, well-formed accepted, unpadded activity date, unpadded paid_date); 136 tests passing; tsc clean
 - [x] Phase B1 (C1 observability) — `captureConsoleIntegration({ levels: ['error'] })` added to sentry.server.config.ts + sentry.edge.config.ts (export verified in installed @sentry/node and @sentry/vercel-edge); false "console.error is captured" comments fixed; all 24 server-side `console.error` sites in actions, guards, photo util, and auth callback route swept to `logError(scope, err)` with dotted scopes (`action.step`); remaining console.error sites are intentional (rate-limiter module scope, client error boundary, logger itself); 5 new tests (tests/logger.test.ts, tests/sentry-config.test.ts); 131 tests passing; tsc clean
 
 - [x] Runtime test harness (PLAN.md) — RC-2 TOCTOU (`payments.test.ts`), RC-1 atomicity (`seasons.test.ts`), PHOTO-1 namespace validation (`photos.test.ts`); all 3 scenarios implemented; 126 tests passing; tsc clean; verified 2026-05-18

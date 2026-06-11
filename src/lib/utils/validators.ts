@@ -13,13 +13,13 @@ export const workerSchema = z.object({
 
 const installmentSchema = z.object({
   amount: z.coerce.number().positive('Amount must be greater than 0'),
-  due_date: z.string().min(1, 'Due date is required'),
+  due_date: z.iso.date('Due date must be a valid date (YYYY-MM-DD)'),
 })
 
 export const activitySchema = z.object({
   type: z.enum(['spray', 'water', 'fertilize', 'harvest']),
   farm_id: z.string().uuid('Select a farm'),
-  activity_date: z.string().min(1, 'Date is required'),
+  activity_date: z.iso.date('Date must be a valid date (YYYY-MM-DD)'),
   item_name: z.string().optional().or(z.literal('')),
   meter_reading: z.coerce.number().optional(),
   boxes_collected: z.coerce.number().int().min(0).optional(),
@@ -29,7 +29,7 @@ export const activitySchema = z.object({
 export const expenseSchema = z.object({
   category: z.enum(['electricity', 'spray', 'fertilizer', 'labor', 'misc']),
   amount: z.coerce.number().positive('Amount must be greater than 0'),
-  expense_date: z.string().min(1, 'Date is required'),
+  expense_date: z.iso.date('Date must be a valid date (YYYY-MM-DD)'),
   farm_id: z.string().optional().or(z.literal('')),
   description: z.string().optional().or(z.literal('')),
   linked_activity_id: z.string().optional().or(z.literal('')),
@@ -54,6 +54,6 @@ export const paymentSchema = z.object({
     .number()
     .refine((n) => Number.isFinite(n), { message: 'Amount must be a valid number.' })
     .refine((n) => n > 0, { message: 'Amount must be greater than 0.' }),
-  paid_date: z.string().min(1, 'Payment date is required.'),
+  paid_date: z.iso.date('Payment date must be a valid date (YYYY-MM-DD).'),
   notes: z.string().optional().or(z.literal('')),
 })

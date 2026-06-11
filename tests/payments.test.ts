@@ -318,6 +318,15 @@ describe('recordPayment — season window guard (Phase 10)', () => {
     const result = await recordPayment(activeInstallmentId, makeFormData('2026-05-15'), activeSeasonId)
     expect(result).toMatchObject({ success: true })
   })
+
+  // B2 — unpadded dates defeat the lexicographic window check; Zod must
+  // reject them before the guard runs.
+  it('rejects an unpadded paid_date (2026-05-1)', async () => {
+    setCurrentClient(user.client)
+    const result = await recordPayment(activeInstallmentId, makeFormData('2026-05-1'), activeSeasonId)
+    expect(result).toHaveProperty('error')
+    expect((result as { error: string }).error).toMatch(/valid date/i)
+  })
 })
 
 describe('recordPayment — amount validation (Phase 11C)', () => {

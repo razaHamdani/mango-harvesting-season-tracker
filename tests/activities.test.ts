@@ -357,6 +357,16 @@ describe('createActivity — season window guard (Phase 10)', () => {
     const result = await createActivity(makeFormData('2026-05-01'), activeSeasonId)
     expect(result).toMatchObject({ success: true })
   })
+
+  // B2 — unpadded dates defeat the lexicographic window check; Zod must
+  // reject them before the guard runs.
+  it('rejects an unpadded activity date (2026-05-1)', async () => {
+    setCurrentClient(user.client)
+    const result = await createActivity(makeFormData('2026-05-1'), activeSeasonId)
+    expect(result).toHaveProperty('error')
+    const err = (result as { error: Record<string, string[]> }).error
+    expect(err.activity_date?.[0]).toMatch(/valid date/i)
+  })
 })
 
 /**
