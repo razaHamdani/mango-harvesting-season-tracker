@@ -2,10 +2,11 @@
 
 ## Currently Working On
 
-Production blockers C1–C4 (PLAN.md approved 2026-06-11) — B1, B2 complete; next: Phase B3 (APP_TIMEZONE "today" helper).
+Production blockers C1–C4 (PLAN.md approved 2026-06-11) — B1, B2, B3 complete; next: Phase B4 (closed-season delete guard).
 
 ## Completed
 
+- [x] Phase B3 (C4 business-timezone "today") — new `src/lib/utils/app-date.ts` `todayInAppTz()` (APP_TIMEZONE env, default Asia/Karachi, en-CA Intl format); wired into `assertWithinSeasonWindow` future-date cap and `activateSeason` started_at stamp; APP_TIMEZONE documented in .env.example; seasons.test.ts started_at assertion switched to todayInAppTz() (UTC expectation would go flaky 19:00–24:00 UTC); 5 new tests in tests/app-date.test.ts (Karachi rollover at 21:00 UTC, UTC-agreement, env override, guard accepts Karachi-today/rejects Karachi-tomorrow via fake Date + stub client); 141 tests passing; tsc clean
 - [x] Phase B2 (C3 date hardening) — `z.iso.date()` replaces `z.string().min(1)` on `due_date`, `activity_date`, `expense_date`, `paid_date` in validators.ts; closes the unpadded-date window bypass ('2026-06-1' sorted after '2026-06-05' lexicographically but parses to June 1) and rejects calendar-invalid dates; 5 new tests (bypass + no-insert, 2026-02-30, well-formed accepted, unpadded activity date, unpadded paid_date); 136 tests passing; tsc clean
 - [x] Phase B1 (C1 observability) — `captureConsoleIntegration({ levels: ['error'] })` added to sentry.server.config.ts + sentry.edge.config.ts (export verified in installed @sentry/node and @sentry/vercel-edge); false "console.error is captured" comments fixed; all 24 server-side `console.error` sites in actions, guards, photo util, and auth callback route swept to `logError(scope, err)` with dotted scopes (`action.step`); remaining console.error sites are intentional (rate-limiter module scope, client error boundary, logger itself); 5 new tests (tests/logger.test.ts, tests/sentry-config.test.ts); 131 tests passing; tsc clean
 

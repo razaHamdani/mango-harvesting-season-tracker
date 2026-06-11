@@ -3,6 +3,7 @@ import { createAdminClient, resetDb } from './helpers/admin'
 import { createTestUser, deleteTestUser, TestUser } from './helpers/user'
 import { setCurrentClient, clearCurrentClient } from './setup'
 import { createSeason, activateSeason, closeSeason } from '@/lib/actions/season-actions'
+import { todayInAppTz } from '@/lib/utils/app-date'
 
 const BASE = {
   year: 2026,
@@ -334,9 +335,11 @@ describe('activateSeason — started_at population (Phase 10)', () => {
       .single()
     expect(pre?.started_at).toBeNull()
 
-    // Activate
+    // Activate. B3: started_at is stamped in the business timezone
+    // (Asia/Karachi), not UTC — a UTC expectation would go flaky between
+    // 19:00 and 24:00 UTC when the two dates differ.
     setCurrentClient(user.client)
-    const today = new Date().toISOString().slice(0, 10)
+    const today = todayInAppTz()
     const activateResult = await activateSeason(seasonId)
     expect(activateResult).toMatchObject({ success: true })
 

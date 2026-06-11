@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { seasonCreateSchema } from '@/lib/utils/validators'
 import { mutationLimiter, enforceLimit } from '@/lib/utils/rate-limiter'
 import { logError } from '@/lib/utils/logger'
+import { todayInAppTz } from '@/lib/utils/app-date'
 
 type SeasonInput = {
   year: number
@@ -195,9 +196,10 @@ export async function activateSeason(id: string) {
 
   // The partial unique index 'one_active_season_per_owner' enforces the
   // one-active-at-a-time rule atomically. No pre-check needed.
-  // started_at = today's date (UTC ISO, then sliced to YYYY-MM-DD) is the
-  // business start of the season — used to reject pre-dated child records.
-  const startedAt = new Date().toISOString().slice(0, 10)
+  // started_at = today's date in the business timezone — used to reject
+  // pre-dated child records. Activating at 1am PKT must stamp the PKT date,
+  // not the UTC one (which would still be yesterday).
+  const startedAt = todayInAppTz()
   const { error } = await supabase
     .from('seasons')
     .update({ status: 'active', started_at: startedAt })

@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { todayInAppTz } from '@/lib/utils/app-date'
 
 export type GuardResult =
   | { ok: true }
@@ -40,7 +41,10 @@ export async function assertWithinSeasonWindow(
     }
   }
 
-  const today = new Date().toISOString().slice(0, 10)
+  // "Today" in the business timezone (APP_TIMEZONE, default Asia/Karachi) —
+  // a UTC "today" would reject legitimate local entries between 00:00 and
+  // 05:00 PKT every night.
+  const today = todayInAppTz()
   if (date > today) {
     return { ok: false, error: 'Date cannot be in the future.' }
   }
