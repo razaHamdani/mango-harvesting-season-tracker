@@ -51,15 +51,17 @@ export async function signUpUser(
     return { error: 'Enter a valid email address.' }
   }
 
+  // Rate limit signups by IP (fail-closed) — BEFORE the MX lookup, so an
+  // unauthenticated caller can't trigger unlimited DNS resolutions. The
+  // format regex above is free; DNS is not.
+  const ip = await getClientIpFromHeaders()
+  const { allowed } = await enforceLimit(authLimiter, `ip:${ip}`)
+  if (!allowed) return { error: 'Too many requests. Try again later.' }
+
   const domain = email.split('@')[1]
   if (!await hasMxRecords(domain)) {
     return { error: 'Enter a valid email address.' }
   }
-
-  // Rate limit signups by IP (fail-closed)
-  const ip = await getClientIpFromHeaders()
-  const { allowed } = await enforceLimit(authLimiter, `ip:${ip}`)
-  if (!allowed) return { error: 'Too many requests. Try again later.' }
 
   const supabase = await createClient()
 

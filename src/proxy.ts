@@ -2,9 +2,6 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { Database } from '@/types/database'
-import { authLimiter, enforceLimit } from '@/lib/utils/rate-limiter'
-import { getClientIp } from '@/lib/utils/client-ip'
-
 function buildCsp(nonce: string): string {
   const isDev = process.env.NODE_ENV === 'development'
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? ''
@@ -22,19 +19,12 @@ function buildCsp(nonce: string): string {
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
-  const { method } = request
 
-  // Rate limit: auth endpoint (fail-closed — authLimiter default)
-  if (pathname === '/login' && method === 'POST') {
-    const ip = getClientIp(request)
-    const { allowed } = await enforceLimit(authLimiter, `ip:${ip}`)
-    if (!allowed) {
-      return new NextResponse('Too many requests. Please try again later.', {
-        status: 429,
-        headers: { 'Retry-After': '300' },
-      })
-    }
-  }
+  // NOTE: no proxy-level auth rate limit. POSTs to /login are Server Action
+  // invocations, and signInUser / signUpUser / resendConfirmation each
+  // enforce the IP-keyed authLimiter themselves. A proxy-level check on the
+  // same `ip:` bucket double-counted every attempt, silently halving the
+  // documented budget.
 
   // Generate a fresh nonce for this request and forward it to the page.
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64')

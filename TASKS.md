@@ -2,10 +2,11 @@
 
 ## Currently Working On
 
-Pre-launch fixes R1–R4 (PLAN.md approved 2026-06-12) — R1 complete; next: Phase R2 (rate-limiter correctness).
+Pre-launch fixes R1–R4 (PLAN.md approved 2026-06-12) — R1, R2 complete; next: Phase R3 (dashboard insights failure state).
 
 ## Completed
 
+- [x] Phase R2 (rate-limiter correctness) — proxy.ts `/login` POST rate-limit block removed (actions each enforce authLimiter; double-count halved the documented budget); `signUpUser` rate check moved above the `hasMxRecords` DNS lookup; dead `getClientIp(request)` removed from client-ip.ts (proxy was sole caller) + 3 test mocks cleaned; `TRUSTED_XFF` documented in .env.example with Vercel note; 1 new test (limiter blocks before MX lookup, via vi.hoisted spy); 147 tests passing; tsc clean
 - [x] Phase R1 (season lifecycle races) — compare-and-set on all three season transitions: `deleteSeason` DELETE + `.eq('status','draft')`, `closeSeason` UPDATE + `.eq('status','active')`, `activateSeason` UPDATE + `.eq('status','draft')` (added beyond plan: without it a delete-wins race made activate report false success); all three `.select('id')` and treat 0 rows as a status error; 3 new tests (activate-vs-delete race with both-outcome assertions, concurrent double close, delete-after-activate); 146 tests passing; tsc clean
 - [x] Phase B4 (C2 closed-season immutability) — `deleteExpense` and `deleteActivity` Step-1 ownership query extended to `select('id, status')`; deletes rejected with "Records of a closed season cannot be deleted." when status='closed' (zero extra queries; draft seasons can't contain records so only closed needs blocking); 2 new tests in tests/closed-season-immutability.test.ts (both deletes rejected, rows survive); 143 tests passing; tsc clean
 - [x] Phase B3 (C4 business-timezone "today") — new `src/lib/utils/app-date.ts` `todayInAppTz()` (APP_TIMEZONE env, default Asia/Karachi, en-CA Intl format); wired into `assertWithinSeasonWindow` future-date cap and `activateSeason` started_at stamp; APP_TIMEZONE documented in .env.example; seasons.test.ts started_at assertion switched to todayInAppTz() (UTC expectation would go flaky 19:00–24:00 UTC); 5 new tests in tests/app-date.test.ts (Karachi rollover at 21:00 UTC, UTC-agreement, env override, guard accepts Karachi-today/rejects Karachi-tomorrow via fake Date + stub client); 141 tests passing; tsc clean

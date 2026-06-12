@@ -13,7 +13,6 @@ import { createAdminClient } from './helpers/admin'
 // Stub next/headers-dependent utilities so the server action can run.
 vi.mock('@/lib/utils/client-ip', () => ({
   getClientIpFromHeaders: async () => '127.0.0.1',
-  getClientIp: () => '127.0.0.1',
 }))
 
 // Keep EMAIL_RE real (format tests rely on it) but stub the DNS lookup so

@@ -15,8 +15,6 @@
  *  - Bare metal:      configure reverse proxy to overwrite XFF, then set TRUSTED_XFF=leftmost
  */
 
-import type { NextRequest } from 'next/server'
-
 function extractIp(get: (name: string) => string | null): string {
   // 1. Cloudflare
   const cf = get('cf-connecting-ip')
@@ -34,14 +32,6 @@ function extractIp(get: (name: string) => string | null): string {
   }
 
   return 'unknown'
-}
-
-/**
- * Extract client IP from a Next.js middleware request.
- * Use this in proxy.ts / middleware.
- */
-export function getClientIp(request: NextRequest): string {
-  return extractIp((name) => request.headers.get(name))
 }
 
 /**

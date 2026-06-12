@@ -11,7 +11,6 @@ import { describe, it, expect, vi } from 'vitest'
 
 vi.mock('@/lib/utils/client-ip', () => ({
   getClientIpFromHeaders: async () => '127.0.0.1',
-  getClientIp: () => '127.0.0.1',
 }))
 
 vi.mock('@/lib/utils/rate-limiter', () => ({
