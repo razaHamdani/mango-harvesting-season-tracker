@@ -2,10 +2,11 @@
 
 ## Currently Working On
 
-Nothing — pre-launch fixes R1–R4 (PLAN.md 2026-06-12) all complete and pushed. NEXT CONVERSATION ITEM: payment-settle product question (see Remaining).
+Payment shortfall visibility S1–S3 (PLAN.md approved 2026-06-12) — S1 complete; next: Phase S2 (payments tab shows the gap).
 
 ## Completed
 
+- [x] Phase S1 (shortfall helper) — new `src/lib/utils/installment-shortfall.ts`: `summarizeInstallments()` → `{ unpaidCount, underpaidCount, shortfallTotal }` (unpaid = null, underpaid = paid < expected, overpayment ignored) + `buildCloseWarning()` shared wording for server action and client confirm; 12 unit tests in tests/installment-shortfall.test.ts; 161 tests passing; tsc clean
 - [x] Phase R4 (closeSeason warning pre-close) — `SeasonActionButtons` gains optional `unpaidCount` prop; close confirm now reads "N installment(s) still unpaid. Closing is permanent — records become read-only. Close this season?"; both render sites pass the count derived from already-fetched insights (`installments_total - installments_paid` — zero new queries); post-close `result.warning` surfaced via alert as stale-count backup; 149 tests passing; tsc clean
 - [x] Phase R3 (dashboard insights failure state) — `getDashboardData` logs RPC errors via logError and returns `insights: null` (type now `SeasonInsights | null`) instead of a zeroed fallback object; dashboard page derives `insights` once, renders an explicit "Couldn't load season insights" card replacing the hero + KPI strip when null (feed/farms/quick-actions still render — independent queries); 2 new tests in tests/dashboard-insights.test.ts via chainable-thenable stub client; 149 tests passing; tsc clean
 - [x] Phase R2 (rate-limiter correctness) — proxy.ts `/login` POST rate-limit block removed (actions each enforce authLimiter; double-count halved the documented budget); `signUpUser` rate check moved above the `hasMxRecords` DNS lookup; dead `getClientIp(request)` removed from client-ip.ts (proxy was sole caller) + 3 test mocks cleaned; `TRUSTED_XFF` documented in .env.example with Vercel note; 1 new test (limiter blocks before MX lookup, via vi.hoisted spy); 147 tests passing; tsc clean
@@ -85,7 +86,7 @@ Nothing — pre-launch fixes R1–R4 (PLAN.md 2026-06-12) all complete and pushe
 
 ## Remaining
 
-- [ ] REMINDER (after R1–R4 ship): raise the payment-settle product question with the user — `recordPayment` accepts any positive amount and marks the installment settled (`paid_amount` set once, `closeSeason` only counts `paid_amount IS NULL`); a 1-PKR payment settles a 500,000-PKR installment. Decide: validate amount against `expected_amount`, or support partial payments. Review item #12, 2026-06-11.
+- [ ] Post-launch cleanup: `computeStatuses` in installment-schedule.tsx derives the "overdue" badge from UTC today (display-only cousin of C4) — noted in the S1–S3 plan, not fixed there.
 
 - [ ] Phase 3.2: PostgREST aggregate for `getExpenseTotals` — requires Docker/Supabase running to verify aggregate syntax support
 - [ ] Phase 3.7: `unstable_cache` wrappers — deferred (single-user ERP, low ROI without real traffic data)
@@ -96,6 +97,7 @@ Nothing — pre-launch fixes R1–R4 (PLAN.md 2026-06-12) all complete and pushe
 
 ## Decisions & Deviations
 
+- 2026-06-12: Payment-settle question (review #12) decided — option 3: keep single-payment model, record short amounts as-is, surface unpaid vs underpaid (with PKR shortfall) in the schedule, payments KPIs, payment form hint, closeSeason warning, and close confirm. Enforcement (opt 1) and partial-payment ledger (opt 2) rejected.
 - 2026-06-12: R3 — the two pre-existing `Date.now()` react-hooks/purity lint errors in dashboard/page.tsx were fixed opportunistically in the R3 commit (file was hot): clock snapshotted once with a scoped eslint-disable (async RSC renders once per request, so the rule's re-render drift premise doesn't apply).
 - 2026-06-12: R4 — unpaid count derived from already-fetched insights (`installments_total - installments_paid`) instead of the planned dedicated count query; zero added queries, same semantics as closeSeason's `.is('paid_amount', null)` count.
 - 2026-06-12: R1 deviation — `activateSeason` also got the compare-and-set (`.eq('status','draft')` + 0-row check), not just delete/close as planned. Reason: in a delete-wins race its UPDATE matched 0 rows and returned a false success, so "exactly one wins" was unprovable without it. Also closes the same-season double-activate race.
