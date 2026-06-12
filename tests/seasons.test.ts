@@ -2,7 +2,7 @@ import { beforeAll, beforeEach, afterAll, describe, expect, it } from 'vitest'
 import { createAdminClient, resetDb } from './helpers/admin'
 import { createTestUser, deleteTestUser, TestUser } from './helpers/user'
 import { setCurrentClient, clearCurrentClient } from './setup'
-import { createSeason, activateSeason, closeSeason } from '@/lib/actions/season-actions'
+import { createSeason, activateSeason, closeSeason, deleteSeason } from '@/lib/actions/season-actions'
 import { todayInAppTz } from '@/lib/utils/app-date'
 
 const BASE = {
@@ -362,5 +362,124 @@ describe('activateSeason — started_at population (Phase 10)', () => {
       .single()
     expect(closed?.status).toBe('closed')
     expect(closed?.started_at).toBe(today)
+  })
+})
+
+/**
+ * R1 — season lifecycle compare-and-set guards.
+ *
+ * Every status transition (and the draft-only delete) filters on the
+ * expected current status and treats 0 affected rows as failure. Without
+ * this, a delete racing an activate could cascade-destroy an ACTIVE season
+ * with all its children, and racing calls could double-report success.
+ */
+describe('season lifecycle races (R1)', () => {
+  const admin = createAdminClient()
+  let user: TestUser
+
+  async function seedSeason(year: number, status: 'draft' | 'active') {
+    const { data: s } = await admin
+      .from('seasons')
+      .insert({
+        owner_id: user.id,
+        year,
+        status,
+        started_at: status === 'active' ? '2026-01-01' : null,
+        contractor_name: 'Race C',
+        predetermined_amount: 100_000,
+        spray_landlord_pct: 50,
+        fertilizer_landlord_pct: 50,
+        agreed_boxes: 0,
+      })
+      .select('id')
+      .single()
+    if (!s) throw new Error('season seed failed')
+    return s.id
+  }
+
+  beforeEach(async () => {
+    await resetDb(admin)
+    if (user) await deleteTestUser(user.id)
+    user = await createTestUser('season-race')
+    setCurrentClient(user.client)
+  })
+
+  afterAll(async () => {
+    clearCurrentClient()
+    if (user) await deleteTestUser(user.id)
+  })
+
+  it('concurrent activate + delete on the same draft: exactly one wins', async () => {
+    const seasonId = await seedSeason(2026, 'draft')
+
+    const [actRes, delRes] = await Promise.all([
+      activateSeason(seasonId),
+      deleteSeason(seasonId),
+    ])
+
+    const successes = [actRes, delRes].filter((r) => 'success' in r)
+    expect(successes).toHaveLength(1)
+
+    const { data: row } = await admin
+      .from('seasons')
+      .select('status')
+      .eq('id', seasonId)
+      .maybeSingle()
+
+    if ('success' in actRes) {
+      // Activate won — the delete must NOT have removed the active season.
+      expect(row?.status).toBe('active')
+      expect((delRes as { error: { _form: string[] } }).error._form[0]).toMatch(
+        /only draft seasons can be deleted/i
+      )
+    } else {
+      // Delete won — the activate must report failure, not a false success.
+      expect(row).toBeNull()
+      expect((actRes as { error: { _form: string[] } }).error._form[0]).toMatch(
+        /only draft seasons can be activated|season not found/i
+      )
+    }
+  })
+
+  it('concurrent double close: exactly one wins, the loser gets a status error', async () => {
+    const seasonId = await seedSeason(2026, 'active')
+
+    const [res1, res2] = await Promise.all([
+      closeSeason(seasonId),
+      closeSeason(seasonId),
+    ])
+
+    const successes = [res1, res2].filter((r) => 'success' in r)
+    const errors = [res1, res2].filter((r) => 'error' in r)
+    expect(successes).toHaveLength(1)
+    expect(errors).toHaveLength(1)
+    expect((errors[0] as { error: { _form: string[] } }).error._form[0]).toMatch(
+      /only active seasons can be closed/i
+    )
+
+    const { data: row } = await admin
+      .from('seasons')
+      .select('status, closed_at')
+      .eq('id', seasonId)
+      .single()
+    expect(row?.status).toBe('closed')
+    expect(row?.closed_at).not.toBeNull()
+  })
+
+  it('delete after activation is rejected and the season survives', async () => {
+    const seasonId = await seedSeason(2026, 'active')
+
+    const result = await deleteSeason(seasonId)
+    expect(result).toHaveProperty('error')
+    expect((result as { error: { _form: string[] } }).error._form[0]).toMatch(
+      /only draft seasons can be deleted/i
+    )
+
+    const { data: row } = await admin
+      .from('seasons')
+      .select('id')
+      .eq('id', seasonId)
+      .maybeSingle()
+    expect(row).not.toBeNull()
   })
 })

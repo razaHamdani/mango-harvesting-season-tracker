@@ -2,10 +2,11 @@
 
 ## Currently Working On
 
-Nothing — production blockers C1–C4 (PLAN.md 2026-06-11) all complete and committed (B1–B4).
+Pre-launch fixes R1–R4 (PLAN.md approved 2026-06-12) — R1 complete; next: Phase R2 (rate-limiter correctness).
 
 ## Completed
 
+- [x] Phase R1 (season lifecycle races) — compare-and-set on all three season transitions: `deleteSeason` DELETE + `.eq('status','draft')`, `closeSeason` UPDATE + `.eq('status','active')`, `activateSeason` UPDATE + `.eq('status','draft')` (added beyond plan: without it a delete-wins race made activate report false success); all three `.select('id')` and treat 0 rows as a status error; 3 new tests (activate-vs-delete race with both-outcome assertions, concurrent double close, delete-after-activate); 146 tests passing; tsc clean
 - [x] Phase B4 (C2 closed-season immutability) — `deleteExpense` and `deleteActivity` Step-1 ownership query extended to `select('id, status')`; deletes rejected with "Records of a closed season cannot be deleted." when status='closed' (zero extra queries; draft seasons can't contain records so only closed needs blocking); 2 new tests in tests/closed-season-immutability.test.ts (both deletes rejected, rows survive); 143 tests passing; tsc clean
 - [x] Phase B3 (C4 business-timezone "today") — new `src/lib/utils/app-date.ts` `todayInAppTz()` (APP_TIMEZONE env, default Asia/Karachi, en-CA Intl format); wired into `assertWithinSeasonWindow` future-date cap and `activateSeason` started_at stamp; APP_TIMEZONE documented in .env.example; seasons.test.ts started_at assertion switched to todayInAppTz() (UTC expectation would go flaky 19:00–24:00 UTC); 5 new tests in tests/app-date.test.ts (Karachi rollover at 21:00 UTC, UTC-agreement, env override, guard accepts Karachi-today/rejects Karachi-tomorrow via fake Date + stub client); 141 tests passing; tsc clean
 - [x] Phase B2 (C3 date hardening) — `z.iso.date()` replaces `z.string().min(1)` on `due_date`, `activity_date`, `expense_date`, `paid_date` in validators.ts; closes the unpadded-date window bypass ('2026-06-1' sorted after '2026-06-05' lexicographically but parses to June 1) and rejects calendar-invalid dates; 5 new tests (bypass + no-insert, 2026-02-30, well-formed accepted, unpadded activity date, unpadded paid_date); 136 tests passing; tsc clean
@@ -81,6 +82,8 @@ Nothing — production blockers C1–C4 (PLAN.md 2026-06-11) all complete and co
 
 ## Remaining
 
+- [ ] REMINDER (after R1–R4 ship): raise the payment-settle product question with the user — `recordPayment` accepts any positive amount and marks the installment settled (`paid_amount` set once, `closeSeason` only counts `paid_amount IS NULL`); a 1-PKR payment settles a 500,000-PKR installment. Decide: validate amount against `expected_amount`, or support partial payments. Review item #12, 2026-06-11.
+
 - [ ] Phase 3.2: PostgREST aggregate for `getExpenseTotals` — requires Docker/Supabase running to verify aggregate syntax support
 - [ ] Phase 3.7: `unstable_cache` wrappers — deferred (single-user ERP, low ROI without real traffic data)
 - [ ] Phase 4.2: Email confirmation (`enable_confirmations = true`) — deferred pending SMTP provider decision
@@ -89,6 +92,8 @@ Nothing — production blockers C1–C4 (PLAN.md 2026-06-11) all complete and co
 - 2026-04-28: Phase 6D.4 (audit log UI) deferred per plan — wait for real data before designing the activity history page.
 
 ## Decisions & Deviations
+
+- 2026-06-12: R1 deviation — `activateSeason` also got the compare-and-set (`.eq('status','draft')` + 0-row check), not just delete/close as planned. Reason: in a delete-wins race its UPDATE matched 0 rows and returned a false success, so "exactly one wins" was unprovable without it. Also closes the same-season double-activate race.
 
 - 2026-06-11: C3 fix uses `z.iso.date()` (Zod v4) over `z.coerce.date()` — coerce accepts the unpadded-date bypass input and mixes local/UTC parsing; iso.date enforces strict YYYY-MM-DD + calendar validity, strings end-to-end.
 - 2026-06-11: C4 "today" anchored to `APP_TIMEZONE` env (default Asia/Karachi), user-confirmed — dates record farm events, so farm timezone is the anchor; viewer-timezone and UTC+grace alternatives rejected.

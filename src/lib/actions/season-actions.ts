@@ -137,15 +137,26 @@ export async function deleteSeason(id: string) {
     ...(installmentPhotos.data ?? []).map((r) => r.receipt_photo_path),
   ].filter((p): p is string => Boolean(p))
 
-  const { error } = await supabase
+  // Compare-and-set: the status filter closes the TOCTOU window between the
+  // pre-check above and this DELETE. Without it, a concurrent activate could
+  // land in between and this would cascade-delete an ACTIVE season with all
+  // its children. Same pattern as recordPayment's .is('paid_amount', null).
+  const { data: deleted, error } = await supabase
     .from('seasons')
     .delete()
     .eq('id', id)
     .eq('owner_id', user.id)
+    .eq('status', 'draft')
+    .select('id')
 
   if (error) {
     await logError('deleteSeason.delete', error)
     return { error: { _form: ['Failed to delete season.'] } }
+  }
+
+  if (!deleted || deleted.length === 0) {
+    // Status changed between pre-check and delete (e.g. activated in another tab).
+    return { error: { _form: ['Only draft seasons can be deleted.'] } }
   }
 
   // Best-effort storage cleanup. DB cascade already removed the rows.
@@ -199,12 +210,18 @@ export async function activateSeason(id: string) {
   // started_at = today's date in the business timezone — used to reject
   // pre-dated child records. Activating at 1am PKT must stamp the PKT date,
   // not the UTC one (which would still be yesterday).
+  // Compare-and-set: the status filter closes the TOCTOU window between the
+  // pre-check above and this UPDATE (e.g. a concurrent delete removed the row,
+  // or a concurrent activate already flipped it — without the filter both
+  // would report success).
   const startedAt = todayInAppTz()
-  const { error } = await supabase
+  const { data: activated, error } = await supabase
     .from('seasons')
     .update({ status: 'active', started_at: startedAt })
     .eq('id', id)
     .eq('owner_id', user.id)
+    .eq('status', 'draft')
+    .select('id')
 
   if (error?.code === '23505') {
     return {
@@ -217,6 +234,11 @@ export async function activateSeason(id: string) {
   if (error) {
     await logError('activateSeason.update', error)
     return { error: { _form: ['Failed to activate season.'] } }
+  }
+
+  if (!activated || activated.length === 0) {
+    // Row gone or status changed between pre-check and update.
+    return { error: { _form: ['Only draft seasons can be activated.'] } }
   }
 
   revalidatePath(`/seasons/${id}`)
@@ -262,15 +284,25 @@ export async function closeSeason(id: string) {
     .eq('season_id', id)
     .is('paid_amount', null)
 
-  const { error } = await supabase
+  // Compare-and-set: only an active season can transition to closed. Closes
+  // the window where a concurrent close (double-click, second tab) would
+  // silently overwrite closed_at with a later timestamp.
+  const { data: closed, error } = await supabase
     .from('seasons')
     .update({ status: 'closed', closed_at: new Date().toISOString() })
     .eq('id', id)
     .eq('owner_id', user.id)
+    .eq('status', 'active')
+    .select('id')
 
   if (error) {
     await logError('closeSeason.update', error)
     return { error: { _form: ['Failed to close season.'] } }
+  }
+
+  if (!closed || closed.length === 0) {
+    // Status changed between pre-check and update.
+    return { error: { _form: ['Only active seasons can be closed.'] } }
   }
 
   revalidatePath(`/seasons/${id}`)
