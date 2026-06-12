@@ -13,6 +13,7 @@ import { PerAcreMetrics } from '@/components/insights/per-acre-metrics'
 import { SeasonComparison } from '@/components/insights/season-comparison'
 import { NetProfitGauge } from '@/components/insights/net-profit-gauge'
 import { SeasonActionButtons } from '@/components/season/season-action-buttons'
+import { summarizeInstallments } from '@/lib/utils/installment-shortfall'
 import { PrintButton } from '@/components/insights/print-button'
 import { formatPKR } from '@/lib/utils/format'
 
@@ -76,7 +77,7 @@ export default async function SeasonInsightsPage({
           <SeasonActionButtons
             seasonId={seasonId}
             status={season.status}
-            unpaidCount={Math.max(0, view.installmentsTotal - view.installmentsPaid)}
+            shortfall={summarizeInstallments(season.installments)}
           />
         )}
         <div className="ml-auto">

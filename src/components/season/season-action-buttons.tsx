@@ -4,17 +4,18 @@ import { useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { activateSeason, closeSeason, deleteSeason } from '@/lib/actions/season-actions'
+import { buildCloseWarning, type InstallmentSummary } from '@/lib/utils/installment-shortfall'
 import type { SeasonStatus } from '@/types/database'
 
 export function SeasonActionButtons({
   seasonId,
   status,
-  unpaidCount = 0,
+  shortfall,
 }: {
   seasonId: string
   status: SeasonStatus
-  /** Unpaid installments, shown in the close confirmation. Server-computed. */
-  unpaidCount?: number
+  /** Unpaid/underpaid summary, shown in the close confirmation. Server-computed. */
+  shortfall?: InstallmentSummary
 }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -29,16 +30,14 @@ export function SeasonActionButtons({
   }
 
   function handleClose() {
-    // Surface unpaid installments BEFORE the close — closing is permanent
-    // and records become read-only, so this is the user's last chance to
-    // notice missing payments.
-    const unpaidNote =
-      unpaidCount > 0
-        ? `${unpaidCount} installment${unpaidCount === 1 ? '' : 's'} still unpaid.\n\n`
-        : ''
+    // Surface unpaid/underpaid installments BEFORE the close — closing is
+    // permanent and records become read-only, so this is the user's last
+    // chance to notice missing or short payments. Same wording as the
+    // server-side warning (shared builder).
+    const warningNote = shortfall ? buildCloseWarning(shortfall) : null
     if (
       !confirm(
-        `${unpaidNote}Closing is permanent — records become read-only. Close this season?`,
+        `${warningNote ? `${warningNote}\n\n` : ''}Closing is permanent — records become read-only. Close this season?`,
       )
     ) {
       return

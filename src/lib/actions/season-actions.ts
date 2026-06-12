@@ -6,6 +6,7 @@ import { seasonCreateSchema } from '@/lib/utils/validators'
 import { mutationLimiter, enforceLimit } from '@/lib/utils/rate-limiter'
 import { logError } from '@/lib/utils/logger'
 import { todayInAppTz } from '@/lib/utils/app-date'
+import { summarizeInstallments, buildCloseWarning } from '@/lib/utils/installment-shortfall'
 
 type SeasonInput = {
   year: number
@@ -276,13 +277,14 @@ export async function closeSeason(id: string) {
     return { error: { _form: ['Only active seasons can be closed.'] } }
   }
 
-  // Phase 5D.7 — warn (but allow) when unpaid installments still exist.
-  // The UI can surface the warning so the user confirms before closing.
-  const { count: unpaidCount } = await supabase
+  // Phase 5D.7 / S3 — warn (but allow) when installments are unpaid OR were
+  // recorded short. Fetches the amount columns instead of a head-count:
+  // underpaid means paid_amount < expected_amount, and PostgREST can't
+  // compare two columns in a filter.
+  const { data: installmentRows } = await supabase
     .from('installments')
-    .select('id', { count: 'exact', head: true })
+    .select('expected_amount, paid_amount')
     .eq('season_id', id)
-    .is('paid_amount', null)
 
   // Compare-and-set: only an active season can transition to closed. Closes
   // the window where a concurrent close (double-click, second tab) would
@@ -308,11 +310,9 @@ export async function closeSeason(id: string) {
   revalidatePath(`/seasons/${id}`)
   revalidatePath('/seasons')
 
-  if (unpaidCount && unpaidCount > 0) {
-    return {
-      success: true as const,
-      warning: `${unpaidCount} installment${unpaidCount === 1 ? '' : 's'} still unpaid.`,
-    }
+  const warning = buildCloseWarning(summarizeInstallments(installmentRows ?? []))
+  if (warning) {
+    return { success: true as const, warning }
   }
   return { success: true as const }
 }

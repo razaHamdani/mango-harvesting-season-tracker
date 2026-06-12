@@ -4,6 +4,7 @@ import { getSeasonById, getSeasonInsights } from '@/lib/queries/season-queries'
 import { DutySplitDisplay } from '@/components/season/duty-split-display'
 import { SeasonActionButtons } from '@/components/season/season-action-buttons'
 import { formatPKR } from '@/lib/utils/format'
+import { summarizeInstallments } from '@/lib/utils/installment-shortfall'
 
 export default async function SeasonOverviewPage({
   params,
@@ -29,17 +30,16 @@ export default async function SeasonOverviewPage({
   const boxPct =
     agreedBoxes > 0 ? Math.round((collectedBoxes / agreedBoxes) * 100) : 0
 
-  const unpaidCount = Math.max(
-    0,
-    (insights?.installments_total ?? 0) - (insights?.installments_paid ?? 0),
-  )
+  // Drives the close-confirm warning. Derived from installment rows (already
+  // fetched by getSeasonById) — the insights RPC can't see underpayment.
+  const shortfall = summarizeInstallments(season.installments)
 
   return (
     <div className="flex flex-col gap-6">
       <SeasonActionButtons
         seasonId={season.id}
         status={season.status}
-        unpaidCount={unpaidCount}
+        shortfall={shortfall}
       />
 
       {/* KPI strip */}

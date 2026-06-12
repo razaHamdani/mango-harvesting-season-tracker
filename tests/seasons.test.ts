@@ -289,6 +289,82 @@ describe('closeSeason — unpaid installment warning (5D.7)', () => {
 })
 
 /**
+ * S3 — closeSeason also warns about UNDERPAID installments (recorded short).
+ * Before S3 only paid_amount IS NULL counted; a 1-PKR payment silently
+ * settled a full installment as far as the close warning was concerned.
+ */
+describe('closeSeason — underpaid installment warning (S3)', () => {
+  const admin = createAdminClient()
+  let user: TestUser
+  let seasonId: string
+
+  beforeAll(async () => {
+    await resetDb(admin)
+    user = await createTestUser('season-s3')
+
+    const { data: season } = await admin
+      .from('seasons')
+      .insert({
+        owner_id: user.id,
+        year: 2026,
+        status: 'active',
+        started_at: '2026-01-01',
+        contractor_name: 'Short Contractor',
+        predetermined_amount: 100_000,
+        spray_landlord_pct: 50,
+        fertilizer_landlord_pct: 50,
+        agreed_boxes: 0,
+      })
+      .select('id')
+      .single()
+    if (!season) throw new Error('season insert failed')
+    seasonId = season.id
+
+    // One installment fully paid, one recorded 20,000 short.
+    await admin.from('installments').insert([
+      {
+        season_id: seasonId,
+        installment_number: 1,
+        expected_amount: 50_000,
+        due_date: '2026-04-01',
+        paid_amount: 50_000,
+        paid_date: '2026-04-01',
+      },
+      {
+        season_id: seasonId,
+        installment_number: 2,
+        expected_amount: 50_000,
+        due_date: '2026-05-01',
+        paid_amount: 30_000,
+        paid_date: '2026-05-01',
+      },
+    ])
+  })
+
+  afterAll(async () => {
+    clearCurrentClient()
+    if (user) await deleteTestUser(user.id)
+  })
+
+  it('closes the season and the warning names the underpaid count and PKR shortfall', async () => {
+    setCurrentClient(user.client)
+    const result = await closeSeason(seasonId)
+
+    expect(result).toMatchObject({ success: true })
+    expect((result as { warning?: string }).warning).toBe(
+      '1 installment underpaid (short Rs. 20,000).'
+    )
+
+    const { data: row } = await admin
+      .from('seasons')
+      .select('status')
+      .eq('id', seasonId)
+      .single()
+    expect(row?.status).toBe('closed')
+  })
+})
+
+/**
  * Phase 10 — started_at is set on activation.
  *
  * Draft seasons have started_at = null. activateSeason populates it with

@@ -2,10 +2,11 @@
 
 ## Currently Working On
 
-Payment shortfall visibility S1–S3 (PLAN.md approved 2026-06-12) — S1, S2 complete; next: Phase S3 (close path counts underpaid).
+Nothing — payment shortfall visibility S1–S3 (PLAN.md 2026-06-12) complete and pushed. Review item #12 fully resolved.
 
 ## Completed
 
+- [x] Phase S3 (close path counts underpaid) — `closeSeason` swaps the null-only head-count for `select('expected_amount, paid_amount')` + `summarizeInstallments` + `buildCloseWarning` (return shape unchanged; 5D.7 test still matches); `SeasonActionButtons` `unpaidCount` prop replaced by `shortfall: InstallmentSummary`, confirm text built with the shared `buildCloseWarning`; both render sites pass `summarizeInstallments(season.installments)` (rows already fetched by getSeasonById — replaces the insights-derived count which couldn't see underpayment); 1 new integration test (short-paid installment → exact warning "1 installment underpaid (short Rs. 20,000)."); 162 tests passing; tsc clean
 - [x] Phase S2 (payments tab gap display) — schedule rows recorded short get a "Short Rs. X" badge (overdue variant) next to "Paid"; payments KPI strip uses `summarizeInstallments` and appends "N underpaid (short Rs. X)" when present; payment form shows a non-blocking "Rs. X short of expected — will be recorded as-is" hint when the entered amount is below expected; display glue only, no new tests per plan; 161 tests passing; tsc clean
 - [x] Phase S1 (shortfall helper) — new `src/lib/utils/installment-shortfall.ts`: `summarizeInstallments()` → `{ unpaidCount, underpaidCount, shortfallTotal }` (unpaid = null, underpaid = paid < expected, overpayment ignored) + `buildCloseWarning()` shared wording for server action and client confirm; 12 unit tests in tests/installment-shortfall.test.ts; 161 tests passing; tsc clean
 - [x] Phase R4 (closeSeason warning pre-close) — `SeasonActionButtons` gains optional `unpaidCount` prop; close confirm now reads "N installment(s) still unpaid. Closing is permanent — records become read-only. Close this season?"; both render sites pass the count derived from already-fetched insights (`installments_total - installments_paid` — zero new queries); post-close `result.warning` surfaced via alert as stale-count backup; 149 tests passing; tsc clean
