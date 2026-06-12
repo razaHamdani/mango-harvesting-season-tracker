@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { getCurrentUser } from './_user-context'
+import { logError } from '@/lib/utils/logger'
 import type { Season, Farm, Installment, Activity } from '@/types/database'
 
 export type SeasonWithStats = Season & {
@@ -207,7 +208,9 @@ export async function getActiveSeasonSnapshot(): Promise<ActiveSeasonSnapshot | 
 export type DashboardData = {
   activeSeason:
     | (Season & {
-        insights: SeasonInsights
+        // null = the insights RPC failed; the UI must render an explicit
+        // error state, NOT zeros (zeros are indistinguishable from reality).
+        insights: SeasonInsights | null
         upcomingInstallments: Installment[]
         recentActivities: (Activity & { farm_name: string })[]
       })
@@ -282,19 +285,16 @@ export async function getDashboardData(): Promise<DashboardData> {
     ({ farms, ...a }) => ({ ...a, farm_name: farms?.name ?? '—' }),
   )
 
+  // A failed insights RPC must surface as null (explicit UI error state),
+  // never as a zeroed object — fake zeros on a financial dashboard are
+  // indistinguishable from real data.
+  if (insightsRes.error) {
+    await logError('getDashboardData.insights', insightsRes.error)
+  }
+
   result.activeSeason = {
     ...active,
-    insights: (insightsRes.data as unknown as SeasonInsights) ?? {
-      predetermined_amount: active.predetermined_amount,
-      total_acreage: 0,
-      agreed_boxes: active.agreed_boxes,
-      boxes_received: 0,
-      total_expenses: 0,
-      expenses_by_category: {},
-      total_payments_received: 0,
-      installments_paid: 0,
-      installments_total: 0,
-    },
+    insights: (insightsRes.data as unknown as SeasonInsights) ?? null,
     upcomingInstallments: unpaidInstRes.data ?? [],
     recentActivities,
   }

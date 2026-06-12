@@ -173,35 +173,44 @@ export default async function DashboardPage() {
       .slice(0, 10)
   }
 
+  // Async Server Component: rendered once per request, so a single clock
+  // snapshot cannot drift across re-renders the way the purity rule assumes.
+  // eslint-disable-next-line react-hooks/purity -- RSC, one render per request
+  const now = Date.now()
+
   const dayOfHarvest = activeSeason?.started_at
     ? Math.max(
         0,
         Math.floor(
-          (Date.now() - new Date(activeSeason.started_at).getTime()) / 86400000,
+          (now - new Date(activeSeason.started_at).getTime()) / 86400000,
         ),
       )
     : 0
 
+  // null insights = the RPC failed; render an explicit error card instead of
+  // financial numbers (zeros would be indistinguishable from real data).
+  const insights = activeSeason?.insights ?? null
+
   const paymentPct =
-    activeSeason && activeSeason.predetermined_amount > 0
+    insights && activeSeason && activeSeason.predetermined_amount > 0
       ? Math.min(
-          (activeSeason.insights.total_payments_received /
+          (insights.total_payments_received /
             activeSeason.predetermined_amount) *
             100,
           100,
         )
       : 0
 
-  const boxesReceived = activeSeason?.insights.boxes_received ?? 0
+  const boxesReceived = insights?.boxes_received ?? 0
   const agreedBoxes = activeSeason?.agreed_boxes ?? 0
   const boxPct =
     activeSeason && agreedBoxes > 0
       ? Math.min((boxesReceived / agreedBoxes) * 100, 100)
       : 0
 
-  const totalExpenses = activeSeason?.insights.total_expenses ?? 0
+  const totalExpenses = insights?.total_expenses ?? 0
   const categoryEntries = Object.entries(
-    activeSeason?.insights.expenses_by_category ?? {},
+    insights?.expenses_by_category ?? {},
   ) as [string, number][]
   const topCategory =
     categoryEntries.sort((a, b) => b[1] - a[1])[0]?.[0] ?? '—'
@@ -211,7 +220,7 @@ export default async function DashboardPage() {
       : `${topCategory[0].toUpperCase() + topCategory.slice(1)} leads`
 
   const netProfit =
-    (activeSeason?.insights.total_payments_received ?? 0) - totalExpenses
+    (insights?.total_payments_received ?? 0) - totalExpenses
 
   const nextInstallment = activeSeason?.upcomingInstallments[0]
   const dueDateStr = nextInstallment
@@ -223,7 +232,7 @@ export default async function DashboardPage() {
   }
   if (nextInstallment) {
     const diffDays = Math.ceil(
-      (new Date(nextInstallment.due_date).getTime() - Date.now()) / 86400000,
+      (new Date(nextInstallment.due_date).getTime() - now) / 86400000,
     )
     if (diffDays < 0) {
       dueBadge = { label: `Overdue ${Math.abs(diffDays)}d`, variant: 'overdue' }
@@ -234,8 +243,8 @@ export default async function DashboardPage() {
     }
   }
 
-  const installmentsPaid = activeSeason?.insights.installments_paid ?? 0
-  const installmentsTotal = activeSeason?.insights.installments_total ?? 0
+  const installmentsPaid = insights?.installments_paid ?? 0
+  const installmentsTotal = insights?.installments_total ?? 0
 
   // Render up to 5 ticks evenly spaced — color by index relative to paid count.
   const tickCount = Math.max(installmentsTotal, 0)
@@ -351,6 +360,37 @@ export default async function DashboardPage() {
         </div>
       ) : (
         <>
+          {/* Insights RPC failed — say so instead of rendering fake zeros. */}
+          {!insights && (
+            <div
+              style={{
+                padding: '20px 24px',
+                border: '1px dashed var(--border)',
+                borderRadius: 'var(--radius-card)',
+                background: 'var(--surface)',
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 15,
+                  fontWeight: 600,
+                  color: 'var(--heading)',
+                }}
+              >
+                Couldn&apos;t load season insights
+              </div>
+              <p
+                className="mt-1"
+                style={{ fontSize: 13, color: 'var(--text-muted)' }}
+              >
+                Payments, expenses, and harvest figures are temporarily
+                unavailable. Try refreshing the page.
+              </p>
+            </div>
+          )}
+
+          {insights && (
+            <>
           {/* Hero row: payment progress (60%) + next installment (40%) */}
           <div
             className="grid gap-6"
@@ -371,7 +411,7 @@ export default async function DashboardPage() {
                     lineHeight: 1,
                   }}
                 >
-                  {formatPKR(activeSeason.insights.total_payments_received)}
+                  {formatPKR(insights.total_payments_received)}
                 </span>
                 <span
                   className="mono"
@@ -567,6 +607,8 @@ export default async function DashboardPage() {
               </div>
             </div>
           </div>
+            </>
+          )}
 
           {/* Feed row */}
           <div

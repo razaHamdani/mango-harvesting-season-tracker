@@ -2,10 +2,11 @@
 
 ## Currently Working On
 
-Pre-launch fixes R1–R4 (PLAN.md approved 2026-06-12) — R1, R2 complete; next: Phase R3 (dashboard insights failure state).
+Pre-launch fixes R1–R4 (PLAN.md approved 2026-06-12) — R1, R2, R3 complete; next: Phase R4 (closeSeason warning surfaced pre-close).
 
 ## Completed
 
+- [x] Phase R3 (dashboard insights failure state) — `getDashboardData` logs RPC errors via logError and returns `insights: null` (type now `SeasonInsights | null`) instead of a zeroed fallback object; dashboard page derives `insights` once, renders an explicit "Couldn't load season insights" card replacing the hero + KPI strip when null (feed/farms/quick-actions still render — independent queries); 2 new tests in tests/dashboard-insights.test.ts via chainable-thenable stub client; 149 tests passing; tsc clean
 - [x] Phase R2 (rate-limiter correctness) — proxy.ts `/login` POST rate-limit block removed (actions each enforce authLimiter; double-count halved the documented budget); `signUpUser` rate check moved above the `hasMxRecords` DNS lookup; dead `getClientIp(request)` removed from client-ip.ts (proxy was sole caller) + 3 test mocks cleaned; `TRUSTED_XFF` documented in .env.example with Vercel note; 1 new test (limiter blocks before MX lookup, via vi.hoisted spy); 147 tests passing; tsc clean
 - [x] Phase R1 (season lifecycle races) — compare-and-set on all three season transitions: `deleteSeason` DELETE + `.eq('status','draft')`, `closeSeason` UPDATE + `.eq('status','active')`, `activateSeason` UPDATE + `.eq('status','draft')` (added beyond plan: without it a delete-wins race made activate report false success); all three `.select('id')` and treat 0 rows as a status error; 3 new tests (activate-vs-delete race with both-outcome assertions, concurrent double close, delete-after-activate); 146 tests passing; tsc clean
 - [x] Phase B4 (C2 closed-season immutability) — `deleteExpense` and `deleteActivity` Step-1 ownership query extended to `select('id, status')`; deletes rejected with "Records of a closed season cannot be deleted." when status='closed' (zero extra queries; draft seasons can't contain records so only closed needs blocking); 2 new tests in tests/closed-season-immutability.test.ts (both deletes rejected, rows survive); 143 tests passing; tsc clean
