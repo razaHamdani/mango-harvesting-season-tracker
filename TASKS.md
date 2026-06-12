@@ -2,10 +2,11 @@
 
 ## Currently Working On
 
-Pre-launch fixes R1–R4 (PLAN.md approved 2026-06-12) — R1, R2, R3 complete; next: Phase R4 (closeSeason warning surfaced pre-close).
+Nothing — pre-launch fixes R1–R4 (PLAN.md 2026-06-12) all complete and pushed. NEXT CONVERSATION ITEM: payment-settle product question (see Remaining).
 
 ## Completed
 
+- [x] Phase R4 (closeSeason warning pre-close) — `SeasonActionButtons` gains optional `unpaidCount` prop; close confirm now reads "N installment(s) still unpaid. Closing is permanent — records become read-only. Close this season?"; both render sites pass the count derived from already-fetched insights (`installments_total - installments_paid` — zero new queries); post-close `result.warning` surfaced via alert as stale-count backup; 149 tests passing; tsc clean
 - [x] Phase R3 (dashboard insights failure state) — `getDashboardData` logs RPC errors via logError and returns `insights: null` (type now `SeasonInsights | null`) instead of a zeroed fallback object; dashboard page derives `insights` once, renders an explicit "Couldn't load season insights" card replacing the hero + KPI strip when null (feed/farms/quick-actions still render — independent queries); 2 new tests in tests/dashboard-insights.test.ts via chainable-thenable stub client; 149 tests passing; tsc clean
 - [x] Phase R2 (rate-limiter correctness) — proxy.ts `/login` POST rate-limit block removed (actions each enforce authLimiter; double-count halved the documented budget); `signUpUser` rate check moved above the `hasMxRecords` DNS lookup; dead `getClientIp(request)` removed from client-ip.ts (proxy was sole caller) + 3 test mocks cleaned; `TRUSTED_XFF` documented in .env.example with Vercel note; 1 new test (limiter blocks before MX lookup, via vi.hoisted spy); 147 tests passing; tsc clean
 - [x] Phase R1 (season lifecycle races) — compare-and-set on all three season transitions: `deleteSeason` DELETE + `.eq('status','draft')`, `closeSeason` UPDATE + `.eq('status','active')`, `activateSeason` UPDATE + `.eq('status','draft')` (added beyond plan: without it a delete-wins race made activate report false success); all three `.select('id')` and treat 0 rows as a status error; 3 new tests (activate-vs-delete race with both-outcome assertions, concurrent double close, delete-after-activate); 146 tests passing; tsc clean
@@ -95,6 +96,8 @@ Pre-launch fixes R1–R4 (PLAN.md approved 2026-06-12) — R1, R2, R3 complete; 
 
 ## Decisions & Deviations
 
+- 2026-06-12: R3 — the two pre-existing `Date.now()` react-hooks/purity lint errors in dashboard/page.tsx were fixed opportunistically in the R3 commit (file was hot): clock snapshotted once with a scoped eslint-disable (async RSC renders once per request, so the rule's re-render drift premise doesn't apply).
+- 2026-06-12: R4 — unpaid count derived from already-fetched insights (`installments_total - installments_paid`) instead of the planned dedicated count query; zero added queries, same semantics as closeSeason's `.is('paid_amount', null)` count.
 - 2026-06-12: R1 deviation — `activateSeason` also got the compare-and-set (`.eq('status','draft')` + 0-row check), not just delete/close as planned. Reason: in a delete-wins race its UPDATE matched 0 rows and returned a false success, so "exactly one wins" was unprovable without it. Also closes the same-season double-activate race.
 
 - 2026-06-11: C3 fix uses `z.iso.date()` (Zod v4) over `z.coerce.date()` — coerce accepts the unpadded-date bypass input and mixes local/UTC parsing; iso.date enforces strict YYYY-MM-DD + calendar validity, strings end-to-end.

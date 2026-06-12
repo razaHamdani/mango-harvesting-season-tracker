@@ -29,9 +29,18 @@ export default async function SeasonOverviewPage({
   const boxPct =
     agreedBoxes > 0 ? Math.round((collectedBoxes / agreedBoxes) * 100) : 0
 
+  const unpaidCount = Math.max(
+    0,
+    (insights?.installments_total ?? 0) - (insights?.installments_paid ?? 0),
+  )
+
   return (
     <div className="flex flex-col gap-6">
-      <SeasonActionButtons seasonId={season.id} status={season.status} />
+      <SeasonActionButtons
+        seasonId={season.id}
+        status={season.status}
+        unpaidCount={unpaidCount}
+      />
 
       {/* KPI strip */}
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">

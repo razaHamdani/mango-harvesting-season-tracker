@@ -9,9 +9,12 @@ import type { SeasonStatus } from '@/types/database'
 export function SeasonActionButtons({
   seasonId,
   status,
+  unpaidCount = 0,
 }: {
   seasonId: string
   status: SeasonStatus
+  /** Unpaid installments, shown in the close confirmation. Server-computed. */
+  unpaidCount?: number
 }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -26,13 +29,27 @@ export function SeasonActionButtons({
   }
 
   function handleClose() {
-    if (!confirm('Are you sure you want to close this season? This cannot be undone.')) {
+    // Surface unpaid installments BEFORE the close — closing is permanent
+    // and records become read-only, so this is the user's last chance to
+    // notice missing payments.
+    const unpaidNote =
+      unpaidCount > 0
+        ? `${unpaidCount} installment${unpaidCount === 1 ? '' : 's'} still unpaid.\n\n`
+        : ''
+    if (
+      !confirm(
+        `${unpaidNote}Closing is permanent — records become read-only. Close this season?`,
+      )
+    ) {
       return
     }
     startTransition(async () => {
       const result = await closeSeason(seasonId)
       if (result.error) {
         alert(result.error._form?.join(', ') ?? 'Failed to close season.')
+      } else if ('warning' in result && result.warning) {
+        // Backup for a stale pre-check count (payment recorded in another tab).
+        alert(result.warning)
       }
     })
   }

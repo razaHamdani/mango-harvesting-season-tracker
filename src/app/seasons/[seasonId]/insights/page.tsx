@@ -73,7 +73,11 @@ export default async function SeasonInsightsPage({
       {/* Screen header: action buttons + print button */}
       <div className="flex items-center justify-between" data-print="hide">
         {season.status === 'active' && (
-          <SeasonActionButtons seasonId={seasonId} status={season.status} />
+          <SeasonActionButtons
+            seasonId={seasonId}
+            status={season.status}
+            unpaidCount={Math.max(0, view.installmentsTotal - view.installmentsPaid)}
+          />
         )}
         <div className="ml-auto">
           <PrintButton docTitle={docTitle} />
