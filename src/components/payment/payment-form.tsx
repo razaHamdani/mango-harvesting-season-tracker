@@ -92,6 +92,15 @@ export function PaymentForm({
               onChange={(e) => setAmount(e.target.value)}
               required
             />
+            {/* Non-blocking: short payments are recorded as-is (the schedule
+                and close warning surface the gap). This is just a heads-up. */}
+            {Number(amount) > 0 &&
+              Number(amount) < installment.expected_amount && (
+                <p className="text-xs" style={{ color: 'var(--rust)' }}>
+                  {formatPKR(installment.expected_amount - Number(amount))} short
+                  of expected — will be recorded as-is.
+                </p>
+              )}
           </div>
 
           <div className="flex flex-col gap-1.5">

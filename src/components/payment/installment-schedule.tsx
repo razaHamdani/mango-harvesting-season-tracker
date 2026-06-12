@@ -68,6 +68,13 @@ export function InstallmentSchedule({
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <span className="h-2">Installment #{inst.installment_number}</span>
                   <StatusBadge status={status} />
+                  {/* Recorded short — say so, or the row reads as settled. */}
+                  {status === 'paid' &&
+                    inst.paid_amount! < inst.expected_amount && (
+                      <Badge variant="overdue">
+                        Short {formatPKR(inst.expected_amount - inst.paid_amount!)}
+                      </Badge>
+                    )}
                 </div>
                 <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 4 }}>
                   Due {inst.due_date}

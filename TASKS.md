@@ -2,10 +2,11 @@
 
 ## Currently Working On
 
-Payment shortfall visibility S1–S3 (PLAN.md approved 2026-06-12) — S1 complete; next: Phase S2 (payments tab shows the gap).
+Payment shortfall visibility S1–S3 (PLAN.md approved 2026-06-12) — S1, S2 complete; next: Phase S3 (close path counts underpaid).
 
 ## Completed
 
+- [x] Phase S2 (payments tab gap display) — schedule rows recorded short get a "Short Rs. X" badge (overdue variant) next to "Paid"; payments KPI strip uses `summarizeInstallments` and appends "N underpaid (short Rs. X)" when present; payment form shows a non-blocking "Rs. X short of expected — will be recorded as-is" hint when the entered amount is below expected; display glue only, no new tests per plan; 161 tests passing; tsc clean
 - [x] Phase S1 (shortfall helper) — new `src/lib/utils/installment-shortfall.ts`: `summarizeInstallments()` → `{ unpaidCount, underpaidCount, shortfallTotal }` (unpaid = null, underpaid = paid < expected, overpayment ignored) + `buildCloseWarning()` shared wording for server action and client confirm; 12 unit tests in tests/installment-shortfall.test.ts; 161 tests passing; tsc clean
 - [x] Phase R4 (closeSeason warning pre-close) — `SeasonActionButtons` gains optional `unpaidCount` prop; close confirm now reads "N installment(s) still unpaid. Closing is permanent — records become read-only. Close this season?"; both render sites pass the count derived from already-fetched insights (`installments_total - installments_paid` — zero new queries); post-close `result.warning` surfaced via alert as stale-count backup; 149 tests passing; tsc clean
 - [x] Phase R3 (dashboard insights failure state) — `getDashboardData` logs RPC errors via logError and returns `insights: null` (type now `SeasonInsights | null`) instead of a zeroed fallback object; dashboard page derives `insights` once, renders an explicit "Couldn't load season insights" card replacing the hero + KPI strip when null (feed/farms/quick-actions still render — independent queries); 2 new tests in tests/dashboard-insights.test.ts via chainable-thenable stub client; 149 tests passing; tsc clean

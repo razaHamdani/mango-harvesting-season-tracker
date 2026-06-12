@@ -4,6 +4,7 @@ import { getSeasonById } from '@/lib/queries/season-queries'
 import { getInstallments } from '@/lib/queries/payment-queries'
 import { InstallmentSchedule } from '@/components/payment/installment-schedule'
 import { formatPKR } from '@/lib/utils/format'
+import { summarizeInstallments } from '@/lib/utils/installment-shortfall'
 
 export default async function PaymentsPage({
   params,
@@ -40,6 +41,7 @@ export default async function PaymentsPage({
   const barWidth = Math.min(paymentPercentage, 100)
 
   const nextDue = installments.find((i) => i.paid_amount === null) ?? null
+  const shortfall = summarizeInstallments(installments)
 
   return (
     <div className="flex flex-col gap-6 mt-6">
@@ -61,7 +63,13 @@ export default async function PaymentsPage({
             {formatPKR(Math.max(0, predeterminedAmount - totalReceived))}
           </div>
           <div className="muted t-12 mt-3">
-            {installments.filter((i) => i.paid_amount === null).length} installments to go
+            {shortfall.unpaidCount} installments to go
+            {shortfall.underpaidCount > 0 && (
+              <span style={{ color: 'var(--rust)' }}>
+                {' '}· {shortfall.underpaidCount} underpaid (short{' '}
+                {formatPKR(shortfall.shortfallTotal)})
+              </span>
+            )}
           </div>
         </div>
         {nextDue ? (
