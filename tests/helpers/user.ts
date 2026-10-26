@@ -1,4 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import { randomBytes } from 'crypto'
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from './env'
 import { createAdminClient } from './admin'
 
@@ -17,7 +18,7 @@ export interface TestUser {
  */
 export async function createTestUser(label = 'user'): Promise<TestUser> {
   const admin = createAdminClient()
-  const suffix = Math.random().toString(36).slice(2, 10)
+  const suffix = randomBytes(4).toString('hex')
   const email = `test-${label}-${suffix}@example.com`
   const password = `password-${suffix}`
 
