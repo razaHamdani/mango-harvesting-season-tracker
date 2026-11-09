@@ -50,12 +50,14 @@ export function PhotoUpload({ pathPrefix, name, onChange }: PhotoUploadProps) {
       // See extensionForMime() for rationale.
       const ext = extensionForMime(uploadFile.type)
 
+      const webCrypto: Partial<Crypto> | undefined =
+        typeof crypto !== 'undefined' ? crypto : undefined
       let uuid: string
-      if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
-        uuid = crypto.randomUUID()
-      } else if (typeof crypto !== 'undefined' && 'getRandomValues' in crypto) {
+      if (typeof webCrypto?.randomUUID === 'function') {
+        uuid = webCrypto.randomUUID()
+      } else if (typeof webCrypto?.getRandomValues === 'function') {
         const bytes = new Uint8Array(16)
-        crypto.getRandomValues(bytes)
+        webCrypto.getRandomValues(bytes)
         uuid = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
       } else {
         setState({ kind: 'error', message: 'Secure random generator unavailable', file })
