@@ -22,7 +22,7 @@ function fakeDate(iso: string) {
 }
 
 // Minimal stub: the guard only calls .from().select().eq().maybeSingle().
-function stubSeasonClient(season: { status: string; started_at: string | null }) {
+function stubSeasonClient(season: { status: string; start_date: string; end_date: string }) {
   return {
     from: () => ({
       select: () => ({
@@ -53,7 +53,7 @@ describe('todayInAppTz', () => {
 })
 
 describe('assertWithinSeasonWindow — timezone boundary (B3)', () => {
-  const season = { status: 'active', started_at: '2026-01-01' }
+  const season = { status: 'active', start_date: '2026-01-01', end_date: '2026-12-31' }
 
   it('accepts a record dated "today in Karachi" at 21:00 UTC (C4 regression)', async () => {
     fakeDate('2026-06-11T21:00:00Z')
@@ -66,5 +66,54 @@ describe('assertWithinSeasonWindow — timezone boundary (B3)', () => {
     fakeDate('2026-06-11T21:00:00Z')
     const result = await assertWithinSeasonWindow(stubSeasonClient(season), 's1', '2026-06-13')
     expect(result).toEqual({ ok: false, error: 'Date cannot be in the future.' })
+  })
+})
+
+describe('assertWithinSeasonWindow — season date range', () => {
+  // A finished season: both bounds are in the past relative to the faked "now".
+  const season = { status: 'active', start_date: '2026-01-05', end_date: '2026-05-30' }
+
+  it('rejects a date before start_date', async () => {
+    fakeDate('2026-11-14T10:00:00Z')
+    const result = await assertWithinSeasonWindow(stubSeasonClient(season), 's1', '2026-01-04')
+    expect(result).toEqual({
+      ok: false,
+      error: 'Date must be on or after the season start (2026-01-05).',
+    })
+  })
+
+  it('rejects a date after end_date', async () => {
+    fakeDate('2026-11-14T10:00:00Z')
+    const result = await assertWithinSeasonWindow(stubSeasonClient(season), 's1', '2026-05-31')
+    expect(result).toEqual({
+      ok: false,
+      error: 'Date must be on or before the season end (2026-05-30).',
+    })
+  })
+
+  it('accepts both inclusive bounds', async () => {
+    fakeDate('2026-11-14T10:00:00Z')
+    const client = stubSeasonClient(season)
+    expect(await assertWithinSeasonWindow(client, 's1', '2026-01-05')).toEqual({ ok: true })
+    expect(await assertWithinSeasonWindow(client, 's1', '2026-05-30')).toEqual({ ok: true })
+  })
+
+  it('rejects a future date that is still inside the range', async () => {
+    fakeDate('2026-03-10T10:00:00Z') // 15:00 on the 10th in Karachi
+    const result = await assertWithinSeasonWindow(stubSeasonClient(season), 's1', '2026-03-11')
+    expect(result).toEqual({ ok: false, error: 'Date cannot be in the future.' })
+  })
+
+  it('rejects any date when the season is not active', async () => {
+    fakeDate('2026-11-14T10:00:00Z')
+    const result = await assertWithinSeasonWindow(
+      stubSeasonClient({ ...season, status: 'draft' }),
+      's1',
+      '2026-03-01',
+    )
+    expect(result).toEqual({
+      ok: false,
+      error: 'Season is not active. Activate it before adding records.',
+    })
   })
 })

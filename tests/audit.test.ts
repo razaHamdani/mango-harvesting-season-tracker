@@ -236,6 +236,8 @@ describe('audit triggers — per-table smoke', () => {
       .insert({
         owner_id: userA.id,
         year: 2099,
+        start_date: '2099-01-01',
+        end_date: '2099-12-31',
         contractor_name: 'Trigger Test',
         predetermined_amount: 1000,
         spray_landlord_pct: 50,
@@ -265,6 +267,8 @@ describe('audit triggers — per-table smoke', () => {
       .insert({
         owner_id: userA.id,
         year: 2098,
+        start_date: '2098-01-01',
+        end_date: '2098-12-31',
         contractor_name: 'Expense Trigger Test',
         predetermined_amount: 1000,
         spray_landlord_pct: 50,
@@ -306,6 +310,8 @@ describe('audit triggers — per-table smoke', () => {
       .insert({
         owner_id: userA.id,
         year: 2097,
+        start_date: '2097-01-01',
+        end_date: '2097-12-31',
         contractor_name: 'Installment Trigger Test',
         predetermined_amount: 1000,
         spray_landlord_pct: 50,
@@ -347,6 +353,8 @@ describe('audit triggers — per-table smoke', () => {
       .insert({
         owner_id: userA.id,
         year: 2096,
+        start_date: '2096-01-01',
+        end_date: '2096-12-31',
         contractor_name: 'Activity Trigger Test',
         predetermined_amount: 1000,
         spray_landlord_pct: 50,

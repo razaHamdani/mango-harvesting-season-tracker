@@ -2,6 +2,13 @@
 -- Paste this entire script into the Supabase SQL Editor and run it.
 
 -- ============================================================
+-- EXTENSIONS
+-- ============================================================
+
+-- btree_gist: lets seasons_no_overlap combine owner_id (=) with a daterange (&&).
+CREATE EXTENSION IF NOT EXISTS btree_gist;
+
+-- ============================================================
 -- TABLES
 -- ============================================================
 
@@ -23,7 +30,9 @@ CREATE TABLE public.farms (
 CREATE TABLE public.seasons (
   id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   owner_id              UUID NOT NULL REFERENCES public.profiles(id),
-  year                  INTEGER NOT NULL CHECK (year BETWEEN 2020 AND 2100),
+  year                  INTEGER NOT NULL CHECK (year BETWEEN 2020 AND 2100), -- label: year of start_date
+  start_date            DATE NOT NULL,
+  end_date              DATE NOT NULL,
   status                TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'active', 'closed')),
   contractor_name       TEXT NOT NULL,
   contractor_phone      TEXT,
@@ -34,7 +43,10 @@ CREATE TABLE public.seasons (
   agreed_boxes          INTEGER NOT NULL DEFAULT 0 CHECK (agreed_boxes >= 0),
   created_at            TIMESTAMPTZ DEFAULT NOW(),
   closed_at             TIMESTAMPTZ,
-  UNIQUE (owner_id, year)
+  CONSTRAINT seasons_date_order CHECK (start_date < end_date),
+  -- One owner's seasons cannot overlap (inclusive bounds); several per year are fine.
+  CONSTRAINT seasons_no_overlap
+    EXCLUDE USING gist (owner_id WITH =, daterange(start_date, end_date, '[]') WITH &&)
 );
 
 CREATE UNIQUE INDEX one_active_season_per_owner
@@ -209,6 +221,70 @@ CREATE POLICY "Users can manage own expenses"
   );
 
 -- ============================================================
+-- TRIGGER: child records stay inside their season's date range
+-- ============================================================
+
+-- Child dates must fall inside the season's range.
+-- SECURITY INVOKER: the caller's RLS lets an owner read their own seasons.
+-- A season the caller cannot see yields no row; the insert is then left to
+-- the FK / RLS WITH CHECK to reject, and no other owner's dates are revealed.
+CREATE OR REPLACE FUNCTION public.enforce_season_date_range()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_start DATE;
+    v_end   DATE;
+BEGIN
+    SELECT start_date, end_date INTO v_start, v_end
+    FROM public.seasons
+    WHERE id = NEW.season_id;
+
+    IF NOT FOUND THEN
+        RETURN NEW;
+    END IF;
+
+    IF TG_TABLE_NAME = 'activities' THEN
+        IF NEW.activity_date < v_start OR NEW.activity_date > v_end THEN
+            RAISE EXCEPTION 'activity_date % is outside season date range [%, %]',
+                NEW.activity_date, v_start, v_end
+                USING ERRCODE = '23514';
+        END IF;
+    ELSIF TG_TABLE_NAME = 'expenses' THEN
+        IF NEW.expense_date < v_start OR NEW.expense_date > v_end THEN
+            RAISE EXCEPTION 'expense_date % is outside season date range [%, %]',
+                NEW.expense_date, v_start, v_end
+                USING ERRCODE = '23514';
+        END IF;
+    ELSIF TG_TABLE_NAME = 'installments' THEN
+        IF NEW.due_date < v_start OR NEW.due_date > v_end THEN
+            RAISE EXCEPTION 'due_date % is outside season date range [%, %]',
+                NEW.due_date, v_start, v_end
+                USING ERRCODE = '23514';
+        END IF;
+        IF NEW.paid_date IS NOT NULL
+           AND (NEW.paid_date < v_start OR NEW.paid_date > v_end) THEN
+            RAISE EXCEPTION 'paid_date % is outside season date range [%, %]',
+                NEW.paid_date, v_start, v_end
+                USING ERRCODE = '23514';
+        END IF;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY INVOKER SET search_path = public;
+
+CREATE TRIGGER activities_season_date_range
+  BEFORE INSERT OR UPDATE ON public.activities
+  FOR EACH ROW EXECUTE FUNCTION public.enforce_season_date_range();
+
+CREATE TRIGGER expenses_season_date_range
+  BEFORE INSERT OR UPDATE ON public.expenses
+  FOR EACH ROW EXECUTE FUNCTION public.enforce_season_date_range();
+
+CREATE TRIGGER installments_season_date_range
+  BEFORE INSERT OR UPDATE ON public.installments
+  FOR EACH ROW EXECUTE FUNCTION public.enforce_season_date_range();
+
+-- ============================================================
 -- AUTH TRIGGER: auto-create profile on signup
 -- ============================================================
 
@@ -285,9 +361,10 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- whole thing -- no orphan rows.
 -- ============================================================
 
-CREATE OR REPLACE FUNCTION create_season_with_children(
+CREATE OR REPLACE FUNCTION public.create_season_with_children(
     p_owner_id UUID,
-    p_year INTEGER,
+    p_start_date DATE,
+    p_end_date DATE,
     p_contractor_name TEXT,
     p_contractor_phone TEXT,
     p_contractor_cnic TEXT,
@@ -303,17 +380,32 @@ DECLARE
 BEGIN
     -- Caller must match p_owner_id (defense in depth; RLS would also block)
     IF auth.uid() IS NULL OR auth.uid() <> p_owner_id THEN
-        RAISE EXCEPTION 'Not authorized';
+        RAISE EXCEPTION 'Not authorized' USING ERRCODE = '42501';
+    END IF;
+
+    -- Verify every supplied farm_id is owned by the calling user.
+    -- Prevents cross-user farm linkage even though the FK and season_farms
+    -- RLS only check season ownership, not farm ownership.
+    IF EXISTS (
+        SELECT 1
+        FROM unnest(p_farm_ids) AS fid
+        WHERE fid NOT IN (
+            SELECT id FROM public.farms WHERE owner_id = auth.uid()
+        )
+    ) THEN
+        RAISE EXCEPTION 'One or more farm IDs are not owned by the caller'
+            USING ERRCODE = '42501';
     END IF;
 
     INSERT INTO seasons (
-        owner_id, year, status, contractor_name, contractor_phone,
-        contractor_cnic, predetermined_amount, spray_landlord_pct,
-        fertilizer_landlord_pct, agreed_boxes
+        owner_id, year, start_date, end_date, status, contractor_name,
+        contractor_phone, contractor_cnic, predetermined_amount,
+        spray_landlord_pct, fertilizer_landlord_pct, agreed_boxes
     ) VALUES (
-        p_owner_id, p_year, 'draft', p_contractor_name, p_contractor_phone,
-        p_contractor_cnic, p_predetermined_amount, p_spray_landlord_pct,
-        p_fertilizer_landlord_pct, p_agreed_boxes
+        p_owner_id, EXTRACT(YEAR FROM p_start_date)::int, p_start_date, p_end_date,
+        'draft', p_contractor_name, p_contractor_phone, p_contractor_cnic,
+        p_predetermined_amount, p_spray_landlord_pct, p_fertilizer_landlord_pct,
+        p_agreed_boxes
     ) RETURNING id INTO v_season_id;
 
     INSERT INTO season_farms (season_id, farm_id)

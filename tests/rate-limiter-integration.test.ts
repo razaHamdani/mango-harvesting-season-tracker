@@ -79,7 +79,7 @@ describe('production startup guard', () => {
         /UPSTASH_REDIS_REST_URL.*required in production/
       )
     } finally {
-      // @ts-expect-error
+      // @ts-expect-error -- NODE_ENV is typed read-only; restoring it after the test
       process.env.NODE_ENV = originalEnv
       if (originalUrl !== undefined) process.env.UPSTASH_REDIS_REST_URL = originalUrl
       if (originalToken !== undefined) process.env.UPSTASH_REDIS_REST_TOKEN = originalToken

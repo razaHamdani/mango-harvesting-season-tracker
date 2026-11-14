@@ -54,7 +54,11 @@ export function SeasonActionButtons({
   }
 
   function handleDelete() {
-    if (!confirm('Are you sure you want to delete this draft season? This cannot be undone.')) {
+    const message =
+      status === 'closed'
+        ? 'Delete this closed season? This permanently deletes all of its activities, expenses, installments and photos. This cannot be undone.'
+        : 'Are you sure you want to delete this draft season? This cannot be undone.'
+    if (!confirm(message)) {
       return
     }
     startTransition(async () => {
@@ -67,12 +71,13 @@ export function SeasonActionButtons({
     })
   }
 
-  if (status === 'closed') {
-    return null
-  }
-
   return (
     <div className="flex gap-2">
+      {status === 'closed' && (
+        <Button variant="destructive" onClick={handleDelete} disabled={isPending}>
+          Delete Season
+        </Button>
+      )}
       {status === 'draft' && (
         <>
           <Button onClick={handleActivate} disabled={isPending}>

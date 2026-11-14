@@ -32,7 +32,8 @@ describe('createExpense', () => {
         owner_id: user.id,
         year: 2026,
         status: 'active',
-        started_at: '2026-01-01',
+        start_date: '2026-01-01',
+        end_date: '2026-12-31',
         contractor_name: 'Ali',
         predetermined_amount: 200_000,
         spray_landlord_pct: 50,
@@ -159,7 +160,8 @@ describe('deleteExpense — IDOR protection', () => {
         owner_id: userA.id,
         year: 2026,
         status: 'active',
-        started_at: '2026-01-01',
+        start_date: '2026-01-01',
+        end_date: '2026-12-31',
         contractor_name: 'A Contractor',
         predetermined_amount: 100_000,
         spray_landlord_pct: 50,
@@ -255,7 +257,8 @@ describe('getExpenses — ownership guard', () => {
         owner_id: userA.id,
         year: 2026,
         status: 'active',
-        started_at: '2026-01-01',
+        start_date: '2026-01-01',
+        end_date: '2026-12-31',
         contractor_name: 'A Contractor',
         predetermined_amount: 100_000,
         spray_landlord_pct: 50,
@@ -329,7 +332,8 @@ describe('createExpense — foreign linked_activity_id (5D.3)', () => {
         owner_id: userA.id,
         year: 2026,
         status: 'active',
-        started_at: '2026-01-01',
+        start_date: '2026-01-01',
+        end_date: '2026-12-31',
         contractor_name: 'A',
         predetermined_amount: 100_000,
         spray_landlord_pct: 50,
@@ -356,7 +360,8 @@ describe('createExpense — foreign linked_activity_id (5D.3)', () => {
         owner_id: userB.id,
         year: 2026,
         status: 'active',
-        started_at: '2026-01-01',
+        start_date: '2026-01-01',
+        end_date: '2026-12-31',
         contractor_name: 'B',
         predetermined_amount: 100_000,
         spray_landlord_pct: 50,
@@ -428,7 +433,8 @@ describe('getExpenses — linked activity', () => {
         owner_id: user.id,
         year: 2026,
         status: 'active',
-        started_at: '2026-01-01',
+        start_date: '2026-01-01',
+        end_date: '2026-12-31',
         contractor_name: 'Linker',
         predetermined_amount: 50_000,
         spray_landlord_pct: 100,
@@ -522,7 +528,8 @@ describe('createExpense — season window guard (Phase 10)', () => {
         owner_id: user.id,
         year: 2026,
         status: 'active',
-        started_at: '2026-04-01',
+        start_date: '2026-04-01',
+        end_date: '2026-12-31',
         contractor_name: 'Active C',
         predetermined_amount: 50_000,
         spray_landlord_pct: 50,
@@ -538,6 +545,8 @@ describe('createExpense — season window guard (Phase 10)', () => {
       .insert({
         owner_id: user.id,
         year: 2027,
+        start_date: '2027-01-01',
+        end_date: '2027-12-31',
         status: 'draft',
         contractor_name: 'Draft C',
         predetermined_amount: 50_000,
@@ -565,7 +574,7 @@ describe('createExpense — season window guard (Phase 10)', () => {
     return fd
   }
 
-  it('rejects expense dated before season started_at', async () => {
+  it('rejects expense dated before season start_date', async () => {
     setCurrentClient(user.client)
     const result = await createExpense(makeFormData('2026-03-15'), activeSeasonId)
     expect(result).toHaveProperty('error')
@@ -581,7 +590,7 @@ describe('createExpense — season window guard (Phase 10)', () => {
     expect(err.expense_date?.[0]).toMatch(/season is not active/i)
   })
 
-  it('accepts expense dated on or after season started_at', async () => {
+  it('accepts expense dated on or after season start_date', async () => {
     setCurrentClient(user.client)
     const result = await createExpense(makeFormData('2026-05-01'), activeSeasonId)
     expect(result).toMatchObject({ success: true })
@@ -625,7 +634,8 @@ describe('createExpense — farm membership guard (Phase 11B)', () => {
         owner_id: user.id,
         year: 2026,
         status: 'active',
-        started_at: '2026-01-01',
+        start_date: '2026-01-01',
+        end_date: '2026-12-31',
         contractor_name: 'Guard C',
         predetermined_amount: 50_000,
         spray_landlord_pct: 50,
@@ -690,7 +700,8 @@ describe('createExpense — worker_id linkage (Phase 12)', () => {
         owner_id: user.id,
         year: 2026,
         status: 'active',
-        started_at: '2026-01-01',
+        start_date: '2026-01-01',
+        end_date: '2026-12-31',
         contractor_name: 'Salary C',
         predetermined_amount: 200_000,
         spray_landlord_pct: 50,
@@ -840,7 +851,8 @@ describe('getExpenses — embedded worker (Phase 12.1A)', () => {
         owner_id: user.id,
         year: 2026,
         status: 'active',
-        started_at: '2026-01-01',
+        start_date: '2026-01-01',
+        end_date: '2026-12-31',
         contractor_name: 'Embed C',
         predetermined_amount: 100_000,
         spray_landlord_pct: 50,
@@ -908,7 +920,8 @@ describe('expenses DB CHECK constraints (Phase 12.1B)', () => {
         owner_id: user.id,
         year: 2026,
         status: 'active',
-        started_at: '2026-01-01',
+        start_date: '2026-01-01',
+        end_date: '2026-12-31',
         contractor_name: 'Check C',
         predetermined_amount: 100_000,
         spray_landlord_pct: 50,
@@ -990,7 +1003,8 @@ describe('expenses worker ON DELETE SET NULL (Phase 12.1C)', () => {
         owner_id: user.id,
         year: 2026,
         status: 'active',
-        started_at: '2026-01-01',
+        start_date: '2026-01-01',
+        end_date: '2026-12-31',
         contractor_name: 'Delete C',
         predetermined_amount: 100_000,
         spray_landlord_pct: 50,
@@ -1065,7 +1079,7 @@ describe('createExpense — date format hardening (B2)', () => {
     await resetDb(admin)
     user = await createTestUser('exp-date-format')
 
-    // started_at chosen so the unpadded bypass date sorts AFTER it
+    // start_date chosen so the unpadded bypass date sorts AFTER it
     // lexicographically while being chronologically before it.
     const { data: season } = await admin
       .from('seasons')
@@ -1073,7 +1087,8 @@ describe('createExpense — date format hardening (B2)', () => {
         owner_id: user.id,
         year: 2026,
         status: 'active',
-        started_at: '2026-06-05',
+        start_date: '2026-06-05',
+        end_date: '2026-12-31',
         contractor_name: 'Format C',
         predetermined_amount: 50_000,
         spray_landlord_pct: 50,

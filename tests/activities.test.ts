@@ -35,7 +35,8 @@ describe('deleteActivity — IDOR protection', () => {
         owner_id: userA.id,
         year: 2026,
         status: 'active',
-        started_at: '2026-01-01',
+        start_date: '2026-01-01',
+        end_date: '2026-12-31',
         contractor_name: 'A Contractor',
         predetermined_amount: 100_000,
         spray_landlord_pct: 50,
@@ -129,7 +130,8 @@ describe('getActivities — ownership guard', () => {
         owner_id: userA.id,
         year: 2026,
         status: 'active',
-        started_at: '2026-01-01',
+        start_date: '2026-01-01',
+        end_date: '2026-12-31',
         contractor_name: 'A Contractor',
         predetermined_amount: 100_000,
         spray_landlord_pct: 50,
@@ -194,7 +196,8 @@ describe('getActivities — linked expenses', () => {
         owner_id: user.id,
         year: 2026,
         status: 'active',
-        started_at: '2026-01-01',
+        start_date: '2026-01-01',
+        end_date: '2026-12-31',
         contractor_name: 'Linker',
         predetermined_amount: 50_000,
         spray_landlord_pct: 100,
@@ -291,7 +294,8 @@ describe('createActivity — season window guard (Phase 10)', () => {
         owner_id: user.id,
         year: 2026,
         status: 'active',
-        started_at: '2026-04-01',
+        start_date: '2026-04-01',
+        end_date: '2026-12-31',
         contractor_name: 'Active C',
         predetermined_amount: 50_000,
         spray_landlord_pct: 50,
@@ -308,6 +312,8 @@ describe('createActivity — season window guard (Phase 10)', () => {
       .insert({
         owner_id: user.id,
         year: 2027,
+        start_date: '2027-01-01',
+        end_date: '2027-12-31',
         status: 'draft',
         contractor_name: 'Draft C',
         predetermined_amount: 50_000,
@@ -336,7 +342,7 @@ describe('createActivity — season window guard (Phase 10)', () => {
     return fd
   }
 
-  it('rejects activity dated before season started_at', async () => {
+  it('rejects activity dated before season start_date', async () => {
     setCurrentClient(user.client)
     const result = await createActivity(makeFormData('2026-03-15'), activeSeasonId)
     expect(result).toHaveProperty('error')
@@ -352,7 +358,7 @@ describe('createActivity — season window guard (Phase 10)', () => {
     expect(err.activity_date?.[0]).toMatch(/season is not active/i)
   })
 
-  it('accepts activity dated on or after season started_at', async () => {
+  it('accepts activity dated on or after season start_date', async () => {
     setCurrentClient(user.client)
     const result = await createActivity(makeFormData('2026-05-01'), activeSeasonId)
     expect(result).toMatchObject({ success: true })
@@ -405,7 +411,8 @@ describe('createActivity — farm membership guard (Phase 11B)', () => {
         owner_id: user.id,
         year: 2026,
         status: 'active',
-        started_at: '2026-01-01',
+        start_date: '2026-01-01',
+        end_date: '2026-12-31',
         contractor_name: 'Guard C',
         predetermined_amount: 50_000,
         spray_landlord_pct: 50,

@@ -2,6 +2,7 @@ import Link from 'next/link'
 import type { SeasonWithStats } from '@/lib/queries/season-queries'
 import { Badge } from '@/components/ui/badge'
 import { formatPKR } from '@/lib/utils/format'
+import { formatSeasonLabel } from '@/lib/utils/season-label'
 
 const STRIPE_COLOR: Record<string, string> = {
   draft: 'var(--clay)',
@@ -48,7 +49,7 @@ export function SeasonCard({ season }: { season: SeasonWithStats }) {
                 color: 'var(--heading)',
               }}
             >
-              {season.year}
+              {formatSeasonLabel(season)}
             </div>
             <div
               className="mt-1.5 truncate"

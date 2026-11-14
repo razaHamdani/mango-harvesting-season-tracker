@@ -7,8 +7,9 @@
  * is still yesterday, so entering today's local date would be rejected as
  * "in the future".
  *
- * Used by assertWithinSeasonWindow (future-date cap) and activateSeason
- * (started_at stamp). Override with APP_TIMEZONE for farms elsewhere.
+ * Used by assertWithinSeasonWindow (future-date cap) and the "day N of
+ * harvest" counters (days since the season's start_date). Override with
+ * APP_TIMEZONE for farms elsewhere.
  */
 const DEFAULT_TIMEZONE = 'Asia/Karachi'
 

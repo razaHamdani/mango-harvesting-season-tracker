@@ -71,6 +71,8 @@ export interface Database {
           id: string;
           owner_id: string;
           year: number;
+          start_date: string;
+          end_date: string;
           status: "draft" | "active" | "closed";
           contractor_name: string;
           contractor_phone: string | null;
@@ -80,13 +82,14 @@ export interface Database {
           fertilizer_landlord_pct: number;
           agreed_boxes: number;
           created_at: string;
-          started_at: string | null;
           closed_at: string | null;
         };
         Insert: {
           id?: string;
           owner_id: string;
           year: number;
+          start_date: string;
+          end_date: string;
           status?: "draft" | "active" | "closed";
           contractor_name: string;
           contractor_phone?: string | null;
@@ -96,13 +99,14 @@ export interface Database {
           fertilizer_landlord_pct?: number;
           agreed_boxes?: number;
           created_at?: string;
-          started_at?: string | null;
           closed_at?: string | null;
         };
         Update: {
           id?: string;
           owner_id?: string;
           year?: number;
+          start_date?: string;
+          end_date?: string;
           status?: "draft" | "active" | "closed";
           contractor_name?: string;
           contractor_phone?: string | null;
@@ -112,7 +116,6 @@ export interface Database {
           fertilizer_landlord_pct?: number;
           agreed_boxes?: number;
           created_at?: string;
-          started_at?: string | null;
           closed_at?: string | null;
         };
         Relationships: [];

@@ -1,4 +1,5 @@
 import { getActiveSeasonSnapshot } from '@/lib/queries/season-queries'
+import { formatSeasonLabel } from '@/lib/utils/season-label'
 
 export async function SidebarSeasonCard() {
   const snapshot = await getActiveSeasonSnapshot()
@@ -34,7 +35,7 @@ export async function SidebarSeasonCard() {
           marginTop: '2px',
         }}
       >
-        {snapshot.year}
+        {formatSeasonLabel(snapshot)}
       </div>
       <div style={{ fontSize: '11.5px', color: 'oklch(0.72 0.02 70)' }}>
         {snapshot.contractor_name} · Day {snapshot.day_of_harvest}

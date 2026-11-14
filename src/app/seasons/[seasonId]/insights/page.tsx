@@ -16,6 +16,7 @@ import { SeasonActionButtons } from '@/components/season/season-action-buttons'
 import { summarizeInstallments } from '@/lib/utils/installment-shortfall'
 import { PrintButton } from '@/components/insights/print-button'
 import { formatPKR } from '@/lib/utils/format'
+import { formatSeasonLabel } from '@/lib/utils/season-label'
 
 export default async function SeasonInsightsPage({
   params,
@@ -41,15 +42,15 @@ export default async function SeasonInsightsPage({
   const user = await getCurrentUser()
   const supabase = await createClient()
 
-  let pastSeasons: { id: string; year: number }[] = []
+  let pastSeasons: { id: string; start_date: string; end_date: string }[] = []
   if (user) {
     const { data } = await supabase
       .from('seasons')
-      .select('id, year')
+      .select('id, start_date, end_date')
       .eq('owner_id', user.id)
       .eq('status', 'closed')
       .neq('id', seasonId)
-      .order('year', { ascending: false })
+      .order('start_date', { ascending: false })
     pastSeasons = data ?? []
   }
 
@@ -59,14 +60,15 @@ export default async function SeasonInsightsPage({
       : []
   const comparisonView = comparisonResults[0] ?? null
 
-  const docTitle = `Insights-${season.year}-${season.contractor_name.replace(/\s+/g, '-')}.pdf`
+  const seasonLabel = formatSeasonLabel(season)
+  const docTitle = `Insights-${season.start_date}-${season.contractor_name.replace(/\s+/g, '-')}.pdf`
 
   return (
     <div className="flex flex-col gap-6 mt-6">
       {/* Print-only report header */}
       <div className="print-only border-b pb-4 mb-2">
         <p className="text-sm text-[color:var(--text-muted)]">
-          {profile?.full_name ?? 'AamDaata'} &mdash; {season.year} Season &mdash; Printed {new Date().toLocaleDateString('en-PK')}
+          {profile?.full_name ?? 'AamDaata'} &mdash; {seasonLabel} Season &mdash; Printed {new Date().toLocaleDateString('en-PK')}
         </p>
         <p className="text-xs muted">Contractor: {season.contractor_name}</p>
       </div>
@@ -117,7 +119,7 @@ export default async function SeasonInsightsPage({
       </div>
 
       <SeasonComparison
-        currentYear={season.year}
+        currentLabel={seasonLabel}
         currentView={view}
         comparisonView={comparisonView}
         pastSeasons={pastSeasons}

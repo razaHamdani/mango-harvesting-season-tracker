@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { getCurrentUser } from './_user-context'
 import { logError } from '@/lib/utils/logger'
+import { daysSinceSeasonStart } from '@/lib/utils/season-label'
 import type { Season, Farm, Installment, Activity } from '@/types/database'
 
 export type SeasonWithStats = Season & {
@@ -26,7 +27,7 @@ export async function listSeasons(): Promise<SeasonWithStats[]> {
     .from('seasons')
     .select('*, season_farms(farm_id, farms(acreage))')
     .eq('owner_id', user.id)
-    .order('year', { ascending: false })
+    .order('start_date', { ascending: false })
 
   if (error) {
     throw new Error(error.message)
@@ -150,7 +151,8 @@ export async function getSeasonInsights(
 
 export type ActiveSeasonSnapshot = {
   id: string
-  year: number
+  start_date: string
+  end_date: string
   contractor_name: string
   day_of_harvest: number
   paid_pct: number
@@ -164,22 +166,16 @@ export async function getActiveSeasonSnapshot(): Promise<ActiveSeasonSnapshot | 
 
   const { data: season, error } = await supabase
     .from('seasons')
-    .select('id, year, contractor_name, started_at, predetermined_amount')
+    .select('id, start_date, end_date, contractor_name, predetermined_amount')
     .eq('owner_id', user.id)
     .eq('status', 'active')
-    .not('started_at', 'is', null)
-    .order('started_at', { ascending: false })
+    .order('start_date', { ascending: false })
     .limit(1)
     .maybeSingle()
 
-  if (error || !season || !season.started_at) return null
+  if (error || !season) return null
 
-  const startedAt = new Date(season.started_at).getTime()
-  const today = Date.now()
-  const day_of_harvest = Math.max(
-    0,
-    Math.floor((today - startedAt) / 86400000),
-  )
+  const day_of_harvest = daysSinceSeasonStart(season.start_date)
 
   const { data: installments } = await supabase
     .from('installments')
@@ -198,7 +194,8 @@ export async function getActiveSeasonSnapshot(): Promise<ActiveSeasonSnapshot | 
 
   return {
     id: season.id,
-    year: season.year,
+    start_date: season.start_date,
+    end_date: season.end_date,
     contractor_name: season.contractor_name,
     day_of_harvest,
     paid_pct,
