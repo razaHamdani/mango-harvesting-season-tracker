@@ -20,7 +20,9 @@ export async function createTestUser(label = 'user'): Promise<TestUser> {
   const admin = createAdminClient()
   const suffix = randomBytes(4).toString('hex')
   const email = `test-${label}-${suffix}@example.com`
-  const password = `password-${suffix}`
+  // Must satisfy the auth password policy (config.toml: min 10, lower+upper+digit);
+  // CLI 3.x enforces it on admin.createUser too.
+  const password = `Passw0rd-${suffix}`
 
   const { data: created, error: createError } =
     await admin.auth.admin.createUser({

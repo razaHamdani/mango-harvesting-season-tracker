@@ -55,7 +55,7 @@ describe('profiles', () => {
     const suffix = Math.random().toString(36).slice(2, 10)
     const { data: created } = await admin.auth.admin.createUser({
       email: `test-rolemeta-${suffix}@example.com`,
-      password: `pass-${suffix}`,
+      password: `Passw0rd-${suffix}`,
       email_confirm: true,
       user_metadata: { full_name: 'Role Test', role: 'landlord' },
     })
