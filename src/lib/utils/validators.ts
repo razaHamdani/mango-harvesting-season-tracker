@@ -37,7 +37,8 @@ export const expenseSchema = z.object({
 })
 
 export const seasonCreateSchema = z.object({
-  year: z.coerce.number().int().min(2020).max(2100),
+  start_date: z.iso.date('Start date must be a valid date (YYYY-MM-DD)'),
+  end_date: z.iso.date('End date must be a valid date (YYYY-MM-DD)'),
   contractor_name: z.string().min(1, 'Contractor name is required'),
   contractor_phone: z.string().regex(/^[\d\s\-]+$/, 'Phone must contain only digits').optional().or(z.literal('')),
   contractor_cnic: z.string().regex(/^[\d\-]+$/, 'CNIC must contain only digits').optional().or(z.literal('')),
@@ -47,6 +48,26 @@ export const seasonCreateSchema = z.object({
   agreed_boxes: z.coerce.number().int().min(0),
   farm_ids: z.array(z.string().uuid()).min(1, 'Select at least one farm'),
   installments: z.array(installmentSchema).min(1, 'At least one installment is required'),
+}).superRefine((data, ctx) => {
+  // ISO YYYY-MM-DD strings compare correctly as strings.
+  if (data.end_date <= data.start_date) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['end_date'],
+      message: 'End date must be after start date.',
+    })
+    return
+  }
+  const outside = data.installments.some(
+    (inst) => inst.due_date < data.start_date || inst.due_date > data.end_date,
+  )
+  if (outside) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['installments'],
+      message: `Installment due dates must be within the season (${data.start_date} to ${data.end_date}).`,
+    })
+  }
 })
 
 export const paymentSchema = z.object({

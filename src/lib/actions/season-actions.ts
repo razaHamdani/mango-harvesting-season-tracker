@@ -5,11 +5,11 @@ import { createClient } from '@/lib/supabase/server'
 import { seasonCreateSchema } from '@/lib/utils/validators'
 import { mutationLimiter, enforceLimit } from '@/lib/utils/rate-limiter'
 import { logError } from '@/lib/utils/logger'
-import { todayInAppTz } from '@/lib/utils/app-date'
 import { summarizeInstallments, buildCloseWarning } from '@/lib/utils/installment-shortfall'
 
 type SeasonInput = {
-  year: number
+  start_date: string
+  end_date: string
   contractor_name: string
   contractor_phone?: string
   contractor_cnic?: string
@@ -64,7 +64,8 @@ export async function createSeason(data: SeasonInput) {
     'create_season_with_children',
     {
       p_owner_id: user.id,
-      p_year: parsed.data.year,
+      p_start_date: parsed.data.start_date,
+      p_end_date: parsed.data.end_date,
       p_contractor_name: parsed.data.contractor_name,
       p_contractor_phone: parsed.data.contractor_phone || null,
       p_contractor_cnic: parsed.data.contractor_cnic || null,
@@ -83,6 +84,17 @@ export async function createSeason(data: SeasonInput) {
       return {
         error: {
           _form: ['An active season already exists. Close it before creating a new one.'],
+        },
+      }
+    }
+    // Exclusion constraint: an owner's season date ranges cannot overlap.
+    if (
+      rpcError?.code === '23P01' ||
+      rpcError?.message?.includes('seasons_no_overlap')
+    ) {
+      return {
+        error: {
+          _form: ['These dates overlap another of your seasons.'],
         },
       }
     }
@@ -108,7 +120,7 @@ export async function deleteSeason(id: string) {
   const { allowed } = await enforceLimit(mutationLimiter, `user:${user.id}`, true)
   if (!allowed) return { error: { _form: ['Too many requests. Try again shortly.'] } }
 
-  // Verify season is in draft status
+  // Draft and closed seasons can be deleted; an active one must be closed first.
   const { data: season } = await supabase
     .from('seasons')
     .select('status')
@@ -120,12 +132,11 @@ export async function deleteSeason(id: string) {
     return { error: { _form: ['Season not found.'] } }
   }
 
-  if (season.status !== 'draft') {
-    return { error: { _form: ['Only draft seasons can be deleted.'] } }
+  if (season.status === 'active') {
+    return { error: { _form: ['An active season cannot be deleted. Close it first.'] } }
   }
 
   // Gather child photo paths before the cascade delete drops them.
-  // Draft seasons usually don't have these, but the schema doesn't enforce that.
   const [expensePhotos, activityPhotos, installmentPhotos] = await Promise.all([
     supabase.from('expenses').select('photo_path').eq('season_id', id),
     supabase.from('activities').select('photo_path').eq('season_id', id),
@@ -147,7 +158,7 @@ export async function deleteSeason(id: string) {
     .delete()
     .eq('id', id)
     .eq('owner_id', user.id)
-    .eq('status', 'draft')
+    .in('status', ['draft', 'closed'])
     .select('id')
 
   if (error) {
@@ -157,7 +168,7 @@ export async function deleteSeason(id: string) {
 
   if (!deleted || deleted.length === 0) {
     // Status changed between pre-check and delete (e.g. activated in another tab).
-    return { error: { _form: ['Only draft seasons can be deleted.'] } }
+    return { error: { _form: ['An active season cannot be deleted. Close it first.'] } }
   }
 
   // Best-effort storage cleanup. DB cascade already removed the rows.
@@ -208,17 +219,13 @@ export async function activateSeason(id: string) {
 
   // The partial unique index 'one_active_season_per_owner' enforces the
   // one-active-at-a-time rule atomically. No pre-check needed.
-  // started_at = today's date in the business timezone — used to reject
-  // pre-dated child records. Activating at 1am PKT must stamp the PKT date,
-  // not the UTC one (which would still be yesterday).
   // Compare-and-set: the status filter closes the TOCTOU window between the
   // pre-check above and this UPDATE (e.g. a concurrent delete removed the row,
   // or a concurrent activate already flipped it — without the filter both
   // would report success).
-  const startedAt = todayInAppTz()
   const { data: activated, error } = await supabase
     .from('seasons')
-    .update({ status: 'active', started_at: startedAt })
+    .update({ status: 'active' })
     .eq('id', id)
     .eq('owner_id', user.id)
     .eq('status', 'draft')

@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import { getSeasonById } from '@/lib/queries/season-queries'
 import { SeasonStatusBadge } from '@/components/season/season-status-badge'
 import { SeasonTabNav } from '@/components/season/season-tab-nav'
+import { formatSeasonLabel } from '@/lib/utils/season-label'
 
 export default async function SeasonLayout({
   children,
@@ -27,7 +28,7 @@ export default async function SeasonLayout({
       <div>
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-3xl font-semibold tracking-tight text-[color:var(--heading)]">
-            Season {season.year}
+            Season {formatSeasonLabel(season)}
           </h1>
           <SeasonStatusBadge status={season.status} />
         </div>

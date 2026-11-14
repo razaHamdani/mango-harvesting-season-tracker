@@ -20,6 +20,7 @@ import { getFarms } from '@/lib/queries/farm-queries'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { formatPKR, formatDate } from '@/lib/utils/format'
+import { formatSeasonLabel, daysSinceSeasonStart } from '@/lib/utils/season-label'
 import type {
   Activity,
   Expense,
@@ -178,13 +179,8 @@ export default async function DashboardPage() {
   // eslint-disable-next-line react-hooks/purity -- RSC, one render per request
   const now = Date.now()
 
-  const dayOfHarvest = activeSeason?.started_at
-    ? Math.max(
-        0,
-        Math.floor(
-          (now - new Date(activeSeason.started_at).getTime()) / 86400000,
-        ),
-      )
+  const dayOfHarvest = activeSeason
+    ? daysSinceSeasonStart(activeSeason.start_date)
     : 0
 
   // null insights = the RPC failed; render an explicit error card instead of
@@ -269,7 +265,7 @@ export default async function DashboardPage() {
                 color: 'var(--heading)',
               }}
             >
-              Season {activeSeason.year}{' '}
+              Season {formatSeasonLabel(activeSeason)}{' '}
               <span
                 style={{
                   color: 'var(--text-muted)',

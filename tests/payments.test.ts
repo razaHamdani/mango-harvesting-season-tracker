@@ -6,7 +6,9 @@ import { recordPayment } from '@/lib/actions/payment-actions'
 
 describe('recordPayment — RC-2 TOCTOU', () => {
   const admin = createAdminClient()
-  const TODAY = new Date().toISOString().slice(0, 10)
+  // A fixed past date inside the season's range: the real "today" would fall
+  // after end_date (2026-12-31) once the calendar rolls into 2027.
+  const PAID_DATE = '2026-06-15'
   let user: TestUser
   let seasonId: string
   let installmentId: string
@@ -31,7 +33,8 @@ describe('recordPayment — RC-2 TOCTOU', () => {
         owner_id: user.id,
         year: 2026,
         status: 'active',
-        started_at: '2026-01-01',
+        start_date: '2026-01-01',
+        end_date: '2026-12-31',
         contractor_name: 'Test Contractor',
         predetermined_amount: 100_000,
         spray_landlord_pct: 100,
@@ -70,7 +73,7 @@ describe('recordPayment — RC-2 TOCTOU', () => {
     const mk = (amount: number) => {
       const fd = new FormData()
       fd.set('amount', String(amount))
-      fd.set('paid_date', TODAY)
+      fd.set('paid_date', PAID_DATE)
       fd.set('notes', `amount=${amount}`)
       return fd
     }
@@ -102,7 +105,7 @@ describe('recordPayment — RC-2 TOCTOU', () => {
   it('allows the legitimate owner to record payment', async () => {
     const fd = new FormData()
     fd.set('amount', '100000')
-    fd.set('paid_date', TODAY)
+    fd.set('paid_date', PAID_DATE)
     const result = await recordPayment(installmentId, fd, seasonId)
     expect('success' in result && result.success).toBe(true)
   })
@@ -111,7 +114,7 @@ describe('recordPayment — RC-2 TOCTOU', () => {
     const mk = (amount: number) => {
       const fd = new FormData()
       fd.set('amount', String(amount))
-      fd.set('paid_date', TODAY)
+      fd.set('paid_date', PAID_DATE)
       return fd
     }
 
@@ -156,7 +159,8 @@ describe('recordPayment — ownership guard', () => {
         owner_id: userA.id,
         year: 2026,
         status: 'active',
-        started_at: '2026-01-01',
+        start_date: '2026-01-01',
+        end_date: '2026-12-31',
         contractor_name: 'A Contractor',
         predetermined_amount: 100_000,
         spray_landlord_pct: 100,
@@ -216,7 +220,7 @@ describe('recordPayment — ownership guard', () => {
 })
 
 /**
- * Phase 10 — recordPayment rejects paid_date before season started_at, and
+ * Phase 10 — recordPayment rejects paid_date before season start_date, and
  * rejects payments against a draft season.
  */
 describe('recordPayment — season window guard (Phase 10)', () => {
@@ -237,7 +241,8 @@ describe('recordPayment — season window guard (Phase 10)', () => {
         owner_id: user.id,
         year: 2026,
         status: 'active',
-        started_at: '2026-04-01',
+        start_date: '2026-04-01',
+        end_date: '2026-12-31',
         contractor_name: 'Active C',
         predetermined_amount: 50_000,
         spray_landlord_pct: 100,
@@ -264,6 +269,8 @@ describe('recordPayment — season window guard (Phase 10)', () => {
       .insert({
         owner_id: user.id,
         year: 2027,
+        start_date: '2027-01-01',
+        end_date: '2027-12-31',
         status: 'draft',
         contractor_name: 'Draft C',
         predetermined_amount: 50_000,
@@ -299,7 +306,7 @@ describe('recordPayment — season window guard (Phase 10)', () => {
     return fd
   }
 
-  it('rejects payment dated before season started_at', async () => {
+  it('rejects payment dated before season start_date', async () => {
     setCurrentClient(user.client)
     const result = await recordPayment(activeInstallmentId, makeFormData('2026-03-15'), activeSeasonId)
     expect(result).toHaveProperty('error')
@@ -313,7 +320,7 @@ describe('recordPayment — season window guard (Phase 10)', () => {
     expect((result as { error: string }).error).toMatch(/season is not active/i)
   })
 
-  it('accepts payment dated on or after season started_at', async () => {
+  it('accepts payment dated on or after season start_date', async () => {
     setCurrentClient(user.client)
     const result = await recordPayment(activeInstallmentId, makeFormData('2026-05-15'), activeSeasonId)
     expect(result).toMatchObject({ success: true })
@@ -354,7 +361,8 @@ describe('recordPayment — amount validation (Phase 11C)', () => {
         owner_id: user.id,
         year: 2026,
         status: 'active',
-        started_at: '2026-01-01',
+        start_date: '2026-01-01',
+        end_date: '2026-12-31',
         contractor_name: 'Val Contractor',
         predetermined_amount: 100_000,
         spray_landlord_pct: 100,

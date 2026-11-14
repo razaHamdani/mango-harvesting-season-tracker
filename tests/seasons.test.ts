@@ -3,10 +3,10 @@ import { createAdminClient, resetDb } from './helpers/admin'
 import { createTestUser, deleteTestUser, TestUser } from './helpers/user'
 import { setCurrentClient, clearCurrentClient } from './setup'
 import { createSeason, activateSeason, closeSeason, deleteSeason } from '@/lib/actions/season-actions'
-import { todayInAppTz } from '@/lib/utils/app-date'
 
 const BASE = {
-  year: 2026,
+  start_date: '2026-01-01',
+  end_date: '2026-12-31',
   contractor_name: 'Test Contractor',
   predetermined_amount: 120_000,
   spray_landlord_pct: 50,
@@ -175,6 +175,8 @@ describe('activateSeason — concurrency guard (5D.5)', () => {
         .insert({
           owner_id: user.id,
           year: 2026 + i,
+          start_date: `${2026 + i}-01-01`,
+          end_date: `${2026 + i}-12-31`,
           status: 'draft',
           contractor_name: `Contractor ${i}`,
           predetermined_amount: 100_000,
@@ -235,8 +237,9 @@ describe('closeSeason — unpaid installment warning (5D.7)', () => {
       .insert({
         owner_id: user.id,
         year: 2026,
+        start_date: '2026-01-01',
+        end_date: '2026-12-31',
         status: 'active',
-        started_at: '2026-01-01',
         contractor_name: 'Contractor',
         predetermined_amount: 120_000,
         spray_landlord_pct: 50,
@@ -307,8 +310,9 @@ describe('closeSeason — underpaid installment warning (S3)', () => {
       .insert({
         owner_id: user.id,
         year: 2026,
+        start_date: '2026-01-01',
+        end_date: '2026-12-31',
         status: 'active',
-        started_at: '2026-01-01',
         contractor_name: 'Short Contractor',
         predetermined_amount: 100_000,
         spray_landlord_pct: 50,
@@ -365,27 +369,28 @@ describe('closeSeason — underpaid installment warning (S3)', () => {
 })
 
 /**
- * Phase 10 — started_at is set on activation.
- *
- * Draft seasons have started_at = null. activateSeason populates it with
- * today's date (UTC). The value persists through closeSeason.
+ * Season date range — the user-chosen start_date / end_date are fixed at
+ * creation. Activation writes status only (it no longer stamps a date), and
+ * the range persists unchanged through closeSeason.
  */
-describe('activateSeason — started_at population (Phase 10)', () => {
+describe('activateSeason — date range unchanged by lifecycle', () => {
   const admin = createAdminClient()
   let user: TestUser
   let seasonId: string
 
   beforeAll(async () => {
     await resetDb(admin)
-    user = await createTestUser('season-started-at')
+    user = await createTestUser('season-range-lifecycle')
 
     const { data: season } = await admin
       .from('seasons')
       .insert({
         owner_id: user.id,
         year: 2026,
+        start_date: '2026-03-01',
+        end_date: '2026-09-30',
         status: 'draft',
-        contractor_name: 'Started-at Contractor',
+        contractor_name: 'Range Contractor',
         predetermined_amount: 100_000,
         spray_landlord_pct: 50,
         fertilizer_landlord_pct: 50,
@@ -402,49 +407,38 @@ describe('activateSeason — started_at population (Phase 10)', () => {
     if (user) await deleteTestUser(user.id)
   })
 
-  it('starts as null on a draft, gets today on activation, and survives close', async () => {
-    // Draft → null
-    const { data: pre } = await admin
-      .from('seasons')
-      .select('started_at')
-      .eq('id', seasonId)
-      .single()
-    expect(pre?.started_at).toBeNull()
-
-    // Activate. B3: started_at is stamped in the business timezone
-    // (Asia/Karachi), not UTC — a UTC expectation would go flaky between
-    // 19:00 and 24:00 UTC when the two dates differ.
+  it('keeps the chosen start_date / end_date through activation and close', async () => {
     setCurrentClient(user.client)
-    const today = todayInAppTz()
     const activateResult = await activateSeason(seasonId)
     expect(activateResult).toMatchObject({ success: true })
 
     const { data: active } = await admin
       .from('seasons')
-      .select('started_at, status')
+      .select('start_date, end_date, status')
       .eq('id', seasonId)
       .single()
     expect(active?.status).toBe('active')
-    expect(active?.started_at).toBe(today)
+    expect(active?.start_date).toBe('2026-03-01')
+    expect(active?.end_date).toBe('2026-09-30')
 
-    // Close → started_at retained
     const closeResult = await closeSeason(seasonId)
     expect(closeResult).toMatchObject({ success: true })
 
     const { data: closed } = await admin
       .from('seasons')
-      .select('started_at, status')
+      .select('start_date, end_date, status')
       .eq('id', seasonId)
       .single()
     expect(closed?.status).toBe('closed')
-    expect(closed?.started_at).toBe(today)
+    expect(closed?.start_date).toBe('2026-03-01')
+    expect(closed?.end_date).toBe('2026-09-30')
   })
 })
 
 /**
  * R1 — season lifecycle compare-and-set guards.
  *
- * Every status transition (and the draft-only delete) filters on the
+ * Every status transition (and the draft/closed-only delete) filters on the
  * expected current status and treats 0 affected rows as failure. Without
  * this, a delete racing an activate could cascade-destroy an ACTIVE season
  * with all its children, and racing calls could double-report success.
@@ -459,8 +453,9 @@ describe('season lifecycle races (R1)', () => {
       .insert({
         owner_id: user.id,
         year,
+        start_date: `${year}-01-01`,
+        end_date: `${year}-12-31`,
         status,
-        started_at: status === 'active' ? '2026-01-01' : null,
         contractor_name: 'Race C',
         predetermined_amount: 100_000,
         spray_landlord_pct: 50,
@@ -506,7 +501,7 @@ describe('season lifecycle races (R1)', () => {
       // Activate won — the delete must NOT have removed the active season.
       expect(row?.status).toBe('active')
       expect((delRes as { error: { _form: string[] } }).error._form[0]).toMatch(
-        /only draft seasons can be deleted/i
+        /active season cannot be deleted/i
       )
     } else {
       // Delete won — the activate must report failure, not a false success.
@@ -548,7 +543,7 @@ describe('season lifecycle races (R1)', () => {
     const result = await deleteSeason(seasonId)
     expect(result).toHaveProperty('error')
     expect((result as { error: { _form: string[] } }).error._form[0]).toMatch(
-      /only draft seasons can be deleted/i
+      /active season cannot be deleted/i
     )
 
     const { data: row } = await admin

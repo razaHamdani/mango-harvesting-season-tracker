@@ -3,6 +3,7 @@ import { getCurrentUser } from '@/lib/queries/_user-context'
 import { getSeasonById } from '@/lib/queries/season-queries'
 import { getSeasonFarms } from '@/lib/queries/activity-queries'
 import { ActivityForm } from '@/components/activity/activity-form'
+import { formatSeasonLabel } from '@/lib/utils/season-label'
 
 export default async function NewActivityPage({
   params,
@@ -28,7 +29,7 @@ export default async function NewActivityPage({
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Log Activity</h1>
         <p className="text-sm text-muted-foreground">
-          Record a farm activity for the {season.year} season
+          Record a farm activity for the {formatSeasonLabel(season)} season
         </p>
       </div>
 

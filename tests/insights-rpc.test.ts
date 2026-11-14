@@ -34,6 +34,8 @@ describe('get_season_insights — ownership guard', () => {
       .insert({
         owner_id: userA.id,
         year: 2026,
+        start_date: '2026-01-01',
+        end_date: '2026-12-31',
         status: 'draft',
         contractor_name: 'A Contractor',
         predetermined_amount: 100_000,
@@ -99,8 +101,9 @@ describe('get_season_insights — labor category folds in salaries + casual labo
       .insert({
         owner_id: user.id,
         year: 2026,
+        start_date: '2026-01-01',
+        end_date: '2026-12-31',
         status: 'active',
-        started_at: '2026-01-01',
         contractor_name: 'Salary Insights C',
         predetermined_amount: 100_000,
         spray_landlord_pct: 50,

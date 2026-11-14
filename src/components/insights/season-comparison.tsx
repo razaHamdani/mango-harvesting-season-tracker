@@ -3,16 +3,17 @@
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import type { SeasonInsightsView } from '@/lib/queries/insights-queries'
 import { formatPKR } from '@/lib/utils/format'
+import { formatSeasonLabel } from '@/lib/utils/season-label'
 
-type PastSeason = { id: string; year: number }
+type PastSeason = { id: string; start_date: string; end_date: string }
 
 export function SeasonComparison({
-  currentYear,
+  currentLabel,
   currentView,
   comparisonView,
   pastSeasons,
 }: {
-  currentYear: number
+  currentLabel: string
   currentView: SeasonInsightsView
   comparisonView: SeasonInsightsView | null
   pastSeasons: PastSeason[]
@@ -41,7 +42,8 @@ export function SeasonComparison({
     )
   }
 
-  const comparisonYear = pastSeasons.find((s) => s.id === selectedId)?.year
+  const comparisonSeason = pastSeasons.find((s) => s.id === selectedId)
+  const comparisonLabel = comparisonSeason ? formatSeasonLabel(comparisonSeason) : undefined
 
   return (
     <div className="card card__pad">
@@ -67,7 +69,7 @@ export function SeasonComparison({
           <option value="">Select past season…</option>
           {pastSeasons.map((s) => (
             <option key={s.id} value={s.id}>
-              {s.year} Season
+              {formatSeasonLabel(s)}
             </option>
           ))}
         </select>
@@ -77,16 +79,16 @@ export function SeasonComparison({
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 20 }}>
           {([
-            { year: comparisonYear, view: comparisonView },
-            { year: currentYear, view: currentView },
-          ] as { year: number | undefined; view: SeasonInsightsView }[]).map(({ year, view }) => {
+            { label: comparisonLabel, view: comparisonView },
+            { label: currentLabel, view: currentView },
+          ] as { label: string | undefined; view: SeasonInsightsView }[]).map(({ label, view }) => {
             const rev = view.predeterminedAmount
             const exp = view.totalExpenses
             const maxBar = Math.max(rev, exp, 1)
             const profit = rev - exp
             return (
-              <div key={year}>
-                <div className="muted t-12 mb-2">{year}</div>
+              <div key={label}>
+                <div className="muted t-12 mb-2">{label}</div>
                 <div
                   style={{
                     display: 'flex',

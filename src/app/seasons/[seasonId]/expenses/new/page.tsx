@@ -4,6 +4,7 @@ import { getSeasonById } from '@/lib/queries/season-queries'
 import { getSeasonFarms, getActivities } from '@/lib/queries/activity-queries'
 import { getWorkers } from '@/lib/queries/worker-queries'
 import { ExpenseForm } from '@/components/expense/expense-form'
+import { formatSeasonLabel } from '@/lib/utils/season-label'
 
 export default async function NewExpensePage({
   params,
@@ -31,7 +32,7 @@ export default async function NewExpensePage({
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Add Expense</h1>
         <p className="text-sm text-muted-foreground">
-          Record an expense for the {season.year} season
+          Record an expense for the {formatSeasonLabel(season)} season
         </p>
       </div>
 

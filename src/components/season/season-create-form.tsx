@@ -32,8 +32,13 @@ export function SeasonCreateForm({ farms }: SeasonCreateFormProps) {
   const [isPending, startTransition] = useTransition()
   const [errors, setErrors] = useState<FieldErrors>({})
 
-  const currentYear = new Date().getFullYear()
-  const [year, setYear] = useState(String(currentYear))
+  // Start defaults to today as a local YYYY-MM-DD (en-CA formats that way).
+  const [startDate, setStartDate] = useState(() =>
+    new Intl.DateTimeFormat('en-CA').format(new Date())
+  )
+  const [endDate, setEndDate] = useState('')
+  // ISO YYYY-MM-DD strings compare correctly as strings.
+  const dateOrderInvalid = startDate !== '' && endDate !== '' && endDate <= startDate
   const [contractorName, setContractorName] = useState('')
   const [contractorPhone, setContractorPhone] = useState('')
   const [contractorCnic, setContractorCnic] = useState('')
@@ -92,6 +97,10 @@ export function SeasonCreateForm({ farms }: SeasonCreateFormProps) {
       return
     }
 
+    if (dateOrderInvalid) {
+      return
+    }
+
     const predNum = parseFloat(predeterminedAmount) || 0
     if (predNum <= 0) {
       setErrors({ predetermined_amount: ['Value must be greater than 0'] })
@@ -101,7 +110,8 @@ export function SeasonCreateForm({ farms }: SeasonCreateFormProps) {
     setErrors({})
 
     const payload = {
-      year: Number(year),
+      start_date: startDate,
+      end_date: endDate,
       contractor_name: contractorName,
       contractor_phone: contractorPhone,
       contractor_cnic: contractorCnic,
@@ -142,23 +152,44 @@ export function SeasonCreateForm({ farms }: SeasonCreateFormProps) {
       <Card>
         <CardHeader>
           <CardTitle>Basic Info</CardTitle>
-          <CardDescription>Season year and contractor details</CardDescription>
+          <CardDescription>Season dates and contractor details</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="year">Year</Label>
-            <Input
-              id="year"
-              type="number"
-              min={2020}
-              max={2100}
-              value={year}
-              onChange={(e) => setYear(e.target.value)}
-              required
-            />
-            {errors.year && (
-              <p className="text-sm text-destructive">{errors.year[0]}</p>
-            )}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="start_date">Start date</Label>
+              <Input
+                id="start_date"
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                required
+              />
+              {errors.start_date && (
+                <p className="text-sm text-destructive">{errors.start_date[0]}</p>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="end_date">End date</Label>
+              <Input
+                id="end_date"
+                type="date"
+                min={startDate || undefined}
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                required
+              />
+              {dateOrderInvalid ? (
+                <p className="text-sm text-destructive">
+                  End date must be after start date.
+                </p>
+              ) : (
+                errors.end_date && (
+                  <p className="text-sm text-destructive">{errors.end_date[0]}</p>
+                )
+              )}
+            </div>
           </div>
 
           <div className="flex flex-col gap-1.5">
@@ -377,6 +408,8 @@ export function SeasonCreateForm({ farms }: SeasonCreateFormProps) {
                 <Input
                   id={`installment-date-${index}`}
                   type="date"
+                  min={startDate || undefined}
+                  max={endDate || undefined}
                   value={row.due_date}
                   onChange={(e) =>
                     updateInstallment(index, 'due_date', e.target.value)

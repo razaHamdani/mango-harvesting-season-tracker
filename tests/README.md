@@ -31,8 +31,12 @@ npm run test:watch    # watch mode
 | File | What it covers |
 |------|---------------|
 | `tests/payments.test.ts` | RC-2: concurrent + sequential double-payment prevention |
-| `tests/seasons.test.ts` | RC-1: bad installment sums rejected; FK violation rolls back atomically |
+| `tests/seasons.test.ts` | RC-1: bad installment sums rejected; FK violation rolls back atomically; date range unchanged by activate/close |
+| `tests/season-date-range.test.ts` | Season date range: two non-overlapping seasons per year, overlap rejected; app guard + DB trigger reject out-of-range child dates; active season can't be deleted, closed/draft can |
+| `tests/season-date-range-unit.test.ts` | DB-free: `seasonCreateSchema` date-range rules; `formatSeasonLabel` |
 | `tests/photos.test.ts` | PHOTO-1: valid path persisted; spoofed/wrong-namespace path → null |
+
+Season fixtures must set `start_date` and `end_date`; one user's seasons must not overlap, and every child date (`activity_date`, `expense_date`, `due_date`, `paid_date`) must fall inside its season's range.
 
 ## How it works
 

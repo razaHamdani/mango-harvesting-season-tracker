@@ -78,7 +78,7 @@ export async function getActivities(
 
   // Batch-fetch linked expenses for this page of activities in one query.
   const activityIds = pageRows.map((r) => r.id)
-  let linkedExpensesMap: Record<string, { id: string; category: string; description: string | null; amount: number }[]> = {}
+  const linkedExpensesMap: Record<string, { id: string; category: string; description: string | null; amount: number }[]> = {}
 
   if (activityIds.length > 0) {
     const { data: expenseRows } = await supabase
