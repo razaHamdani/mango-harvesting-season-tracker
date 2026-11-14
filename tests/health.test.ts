@@ -1,6 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { GET } from '@/app/api/health/route'
 
+// connection() throws outside a Next request scope; in production it only
+// opts the route out of prerendering, so a no-op is the faithful stand-in.
+vi.mock('next/server', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('next/server')>()),
+  connection: async () => {},
+}))
+
 // Runs against the local Supabase started in CI; .env.test (loaded by
 // vitest.config.ts) provides NEXT_PUBLIC_SUPABASE_URL / ANON_KEY.
 describe('GET /api/health', () => {
