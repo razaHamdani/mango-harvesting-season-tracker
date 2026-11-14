@@ -7,7 +7,9 @@ on:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # PR runs are superseded by newer pushes; runs on main are never cancelled,
+  # so a quick second merge cannot cancel a running migration.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   lint-typecheck:
@@ -23,6 +25,8 @@ jobs:
       - run: npm ci
       - run: npx tsc --noEmit
       - run: npm run lint
+      - name: Migration safety lint
+        run: node scripts/check-migrations.mjs
 
   test:
     name: Integration Tests
@@ -85,3 +89,48 @@ jobs:
           NEXT_PUBLIC_SENTRY_DSN: ""
           UPSTASH_REDIS_REST_URL: ""
           UPSTASH_REDIS_REST_TOKEN: ""
+
+  # Applies new migrations to production on every push to main, after lint,
+  # tests and build pass. No approval step. The Supabase CLI runs each
+  # migration file in its own transaction, so a failing file rolls back fully
+  # (schema change and history row). A failed job turns the run red, and
+  # Railway's "Wait for CI" then skips the deploy, so the live app keeps
+  # running against a schema it already knows. See docs/runbook.md.
+  migrate:
+    name: Migrate production DB
+    needs: [lint-typecheck, test, build]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: migrate-production
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    # Production secrets are set only on the steps that run the Supabase CLI,
+    # never on third-party actions; setup-cli is pinned to a commit (v1.7.3).
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@1dedf2c611547ede7232d26866dd3c56ab903bbb # v1.7.3
+        with:
+          version: 3.1.0   # pinned — matches local CLI; bump deliberately, not silently
+      - name: Link project
+        run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+      - name: Show pending migrations
+        run: supabase migration list --remote --password "$SUPABASE_DB_PASSWORD"
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      - name: Apply migrations
+        run: supabase db push --remote --yes --password "$SUPABASE_DB_PASSWORD"
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      - name: Show applied migrations
+        run: supabase migration list --remote --password "$SUPABASE_DB_PASSWORD"
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
