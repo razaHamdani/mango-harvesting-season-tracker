@@ -4,9 +4,9 @@
 // Usage: node scripts/check-migrations.mjs [migrations-dir]
 //   migrations-dir defaults to supabase/migrations (relative to the cwd).
 //
-// Migrations are applied to production automatically on merge to main
-// (the `Migrate production DB` job in .github/workflows/ci.yml), so new
-// migration files must:
+// Migrations are applied to production soon after merge to main, once the
+// owner approves the `Approve production migrations (within 1h)` job in
+// .github/workflows/ci.yml, so new migration files must:
 //   * not be destructive (DROP TABLE/COLUMN/FUNCTION/VIEW/TYPE, TRUNCATE,
 //     RENAME, column type changes) unless the file says why, with a line
 //     comment `-- safety: allow-destructive <reason>`;
@@ -125,7 +125,7 @@ for (const file of files) {
   if (!OVERRIDE_RE.test(original)) {
     for (const re of DESTRUCTIVE) {
       for (const m of sql.matchAll(re)) {
-        violations.push(`${file}: [destructive] "${oneLine(m[0])}" — production migrates automatically on merge; use expand/contract (stop using it first, drop/rename in a later PR) and add a line \`-- safety: allow-destructive <reason>\` when it is intended`)
+        violations.push(`${file}: [destructive] "${oneLine(m[0])}" — production migrates right after merge, once approved; use expand/contract (stop using it first, drop/rename in a later PR) and add a line \`-- safety: allow-destructive <reason>\` when it is intended`)
       }
     }
   }

@@ -48,11 +48,11 @@ To verify Sentry is wired up after a new production deploy:
 
 ---
 
-## Database migrations (automatic)
+## Database migrations (approved, 1-hour window)
 
-Migrations in `supabase/migrations/` are applied to production automatically
-when a PR merges to `main`. There is no manual approval step; the guardrails
-below are what keep it safe.
+Migrations in `supabase/migrations/` reach production only when you approve
+them. After a merge to `main`, if production has pending migrations, CI asks
+for approval; **no answer within 1 hour means no migration and no deploy.**
 
 ### Pipeline
 
@@ -60,15 +60,45 @@ below are what keep it safe.
    database and runs the suite against it; `Lint & Type-check` runs the
    migration safety lint (`node scripts/check-migrations.mjs`).
 2. **Merge to `main`** — lint, tests and build run again on `main`.
-3. **`Migrate production DB`** — once all three pass, this job links the
-   project and runs `supabase db push --remote` (listing migrations before
-   and after). Runs on `main` are never cancelled, and only one migrate job
-   runs at a time, so a quick second merge waits instead of interrupting.
-4. **Railway deploy** — with *Wait for CI* on, Railway deploys only if the
-   whole run (including `Migrate production DB`) is green.
-5. **Railway healthcheck** — the new deployment must answer `/api/health`
+3. **`Check pending production migrations`** — a read-only
+   `supabase db push --remote --dry-run` against production. Nothing
+   pending: the migrate job is skipped, the run is green, Railway deploys.
+   It compares against production, not the PR's files, so migrations you
+   declined earlier are asked about again on the next merge.
+4. **`Approve production migrations (within 1h)`** — runs in the GitHub
+   environment `production-db` and waits for your approval. GitHub emails
+   you; open the run and choose **Review deployments** → Approve or Reject.
+   Once approved, it checks the environment still requires a reviewer with
+   admin bypass off, and that the approval came within 1 hour of the
+   request. It holds no secrets and touches no database.
+   - **Approved within 1 hour** — `Migrate production DB` runs next.
+   - **Rejected or approved after 1 hour** — nothing is applied and the run
+     goes red. GitHub cannot shorten its 30-day approval window, so the job
+     itself refuses a late approval.
+   - **Never answered** — nothing is applied and the run stays yellow
+     ("Waiting") until you reject it or a newer merge replaces it. It does
+     not hold up later merges: each run on `main` runs on its own, and a
+     newer merge's approval request cancels an older one still waiting.
+5. **`Migrate production DB`** — runs `supabase db push --remote` (listing
+   migrations before and after). A running push is never cancelled, and only
+   one runs at a time: an approved run waits for the one in progress, and a
+   newer approved run replaces one still queued (the newer push applies the
+   same migrations). If you merge again while a push is running, you may be
+   asked again for the same migrations; approving then applies nothing new.
+6. **`Newest commit on main`** — fails the run if `main` has moved on to a
+   newer commit. Runs on `main` overlap, so this stops Railway deploying an
+   older commit over a newer one. The newer commit's run deploys instead.
+7. **Railway deploy** — with *Wait for CI* on, Railway deploys only if the
+   whole run is green. A "no" (or no answer) therefore means **that commit
+   is not deployed**: its code may expect the new schema. Production stays
+   on the previous version until a later run is approved.
+8. **Railway healthcheck** — the new deployment must answer `/api/health`
    with 200 (it queries the database) or Railway keeps the old deployment
    live.
+
+To be asked again for the same commit, open the run and use **Re-run all
+jobs**. Re-running only failed jobs keeps the original request time, so
+it would refuse again as late.
 
 ### One-time setup
 
@@ -76,6 +106,16 @@ below are what keep it safe.
   - `SUPABASE_ACCESS_TOKEN` — a Supabase personal access token
   - `SUPABASE_DB_PASSWORD` — the production database password
   - `SUPABASE_PROJECT_ID` — the production project ref
+  These stay repo-level: the pending check reads production before anyone
+  approves.
+- **GitHub environment `production-db`** (Settings → Environments):
+  - Required reviewers: the owner only; **Prevent self-review off** (you
+    approve your own merges).
+  - **Allow administrators to bypass** off.
+  - Deployment branches: `main` only.
+  The approve job fails, and nothing is migrated, if this environment is missing,
+  has no required reviewer, or allows admin bypass. Don't reuse
+  `loyal-imagination / production`: Railway creates and names that one.
 - **Railway** → service → Settings: turn **Wait for CI** on.
 - **Branch protection** — see below.
 
@@ -114,8 +154,10 @@ below are what keep it safe.
 
 ### When the migrate job goes red
 
-1. Open the failed run and read the **Apply migrations** step log for the
-   SQL error.
+1. Open the failed run and see which step failed. **Check the approval gate
+   is configured** or **Check approval came within 1 hour** (in the approve
+   job) means nothing was applied: fix the environment settings or re-run all jobs. Otherwise
+   read the **Apply migrations** step log for the SQL error.
 2. The live app is unaffected: Railway did not deploy this commit.
 3. Fix it with a new PR. Never edit a migration that is already applied.
 4. If the migration history is out of sync with the database, inspect it
@@ -130,8 +172,10 @@ Configure in **Settings → Branches → Branch protection rules** for `main`:
 
 - Require status checks to pass: `Lint & Type-check`, `Integration Tests`,
   `Build` (the jobs' display names)
-- Do **not** make `Migrate production DB` a required check — it never runs on
-  PRs, so a PR would wait for it forever
+- Do **not** make `Check pending production migrations`,
+  `Approve production migrations (within 1h)`, `Migrate production DB` or
+  `Newest commit on main` required checks — they never run on PRs, so a PR would wait for them
+  forever
 - Require branches to be up to date before merging
 - Required approvals: 0 (solo maintainer; GitHub forbids approving your own
   PR)

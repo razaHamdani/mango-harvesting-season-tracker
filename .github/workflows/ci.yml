@@ -6,9 +6,11 @@ on:
   pull_request:
 
 concurrency:
-  group: ci-${{ github.ref }}
-  # PR runs are superseded by newer pushes; runs on main are never cancelled,
-  # so a quick second merge cannot cancel a running migration.
+  # PR runs share a group per branch and are superseded by newer pushes.
+  # Each run on main gets its own group (by commit) and is never cancelled
+  # here: a run waiting for migration approval must not hold up later merges.
+  # Production migrations are serialised by the job-level groups below.
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
@@ -90,16 +92,118 @@ jobs:
           UPSTASH_REDIS_REST_URL: ""
           UPSTASH_REDIS_REST_TOKEN: ""
 
-  # Applies new migrations to production on every push to main, after lint,
-  # tests and build pass. No approval step. The Supabase CLI runs each
-  # migration file in its own transaction, so a failing file rolls back fully
-  # (schema change and history row). A failed job turns the run red, and
-  # Railway's "Wait for CI" then skips the deploy, so the live app keeps
-  # running against a schema it already knows. See docs/runbook.md.
-  migrate:
-    name: Migrate production DB
+  # On every push to main, after lint, tests and build pass, asks production
+  # (read-only dry run) whether any migrations are pending. Nothing pending:
+  # the migrate job is skipped and the run stays green.
+  pending-migrations:
+    name: Check pending production migrations
     needs: [lint-typecheck, test, build]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      pending: ${{ steps.check.outputs.pending }}
+      asked_at: ${{ steps.check.outputs.asked_at }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@1dedf2c611547ede7232d26866dd3c56ab903bbb # v1.7.3
+        with:
+          version: 3.1.0   # pinned — matches local CLI; bump deliberately, not silently
+      - name: Link project
+        run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+      - name: Dry-run push against production
+        id: check
+        # Any CLI error, or output without a migrations list, fails the job
+        # (and so the run) rather than guessing "nothing pending".
+        run: |
+          set -euo pipefail
+          supabase db push --remote --dry-run --output-format json \
+            --password "$SUPABASE_DB_PASSWORD" > push-plan.json
+          migrations=$(jq -s -ec 'last | (.data // .) | .migrations
+            | if type == "array" then . else error("no migrations list in output") end' push-plan.json)
+          count=$(jq 'length' <<<"$migrations")
+          if [ "$count" -gt 0 ]; then
+            echo "pending=true" >> "$GITHUB_OUTPUT"
+            {
+              echo "### $count pending production migration(s)"
+              jq -r '.[] | "- `\(.)`"' <<<"$migrations"
+              echo
+              echo "Approve **Approve production migrations (within 1h)** within 1 hour, or nothing is migrated and this commit is not deployed."
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "pending=false" >> "$GITHUB_OUTPUT"
+            echo "Production is up to date; no migration needed." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          # The approval request appears as soon as this job ends.
+          echo "asked_at=$(date -u +%s)" >> "$GITHUB_OUTPUT"
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+  # The owner's approval, in the `production-db` environment, within 1 hour.
+  # Holds no secrets and touches no database. Rejected or late: it fails and
+  # nothing is migrated. Unanswered: it waits, and the commit is not deployed.
+  # A newer merge's approval request cancels an older one still waiting
+  # (cancel-in-progress), so the newest commit is the one asked about.
+  approve-migrations:
+    name: Approve production migrations (within 1h)
+    needs: [pending-migrations]
+    if: needs.pending-migrations.outputs.pending == 'true'
+    environment: production-db
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    concurrency:
+      group: migrate-approval
+      cancel-in-progress: true
+    permissions:
+      contents: read
+    steps:
+      # If production-db were deleted or renamed, GitHub would silently create
+      # it with no reviewers and this job would run unapproved. Refuse instead.
+      - name: Check the approval gate is configured
+        run: |
+          set -euo pipefail
+          env_json=$(gh api "repos/$GITHUB_REPOSITORY/environments/production-db")
+          reviewers=$(jq '[.protection_rules[]? | select(.type == "required_reviewers")] | length' <<<"$env_json")
+          bypass=$(jq '.can_admins_bypass' <<<"$env_json")
+          if [ "$reviewers" -eq 0 ] || [ "$bypass" != "false" ]; then
+            msg="Environment production-db must have a required reviewer and admin bypass off. Not migrated."
+            echo "::error::$msg"
+            echo "$msg" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+      # GitHub keeps an approval request open for up to 30 days and cannot
+      # shorten that, so the 1-hour limit is enforced here: a late "yes" is a "no".
+      - name: Check approval came within 1 hour
+        run: |
+          set -euo pipefail
+          waited=$(( $(date -u +%s) - ASKED_AT ))
+          echo "Approval came $(( waited / 60 )) min after the request."
+          if [ "$waited" -gt "$MAX_WAIT_SECONDS" ]; then
+            msg="Approval came after 1h, not migrated. To be asked again, use \"Re-run all jobs\" (re-running only failed jobs keeps the old request time) or merge again."
+            echo "::error::$msg"
+            echo "$msg" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+        env:
+          ASKED_AT: ${{ needs.pending-migrations.outputs.asked_at }}
+          MAX_WAIT_SECONDS: 3600
+
+  # Applies pending migrations to production once approved. Never cancelled,
+  # and only one runs at a time. The Supabase CLI runs each migration file in
+  # its own transaction, so a failing file rolls back fully (schema change and
+  # history row). A failed run is red, so Railway's "Wait for CI" skips the
+  # deploy. See docs/runbook.md.
+  migrate:
+    name: Migrate production DB
+    needs: [approve-migrations]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     concurrency:
@@ -134,3 +238,29 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+  # Runs on main overlap (each has its own concurrency group), so an older
+  # commit's run can finish after a newer one's. Fail it then, so Railway's
+  # "Wait for CI" deploys only the newest commit and never rolls back to an
+  # older one. The newer commit's run deploys it, migrations included.
+  newest-commit:
+    name: Newest commit on main
+    needs: [pending-migrations, migrate]
+    if: ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      contents: read
+    steps:
+      - name: Check this commit is still the head of main
+        run: |
+          set -euo pipefail
+          head=$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)
+          if [ "$head" != "$GITHUB_SHA" ]; then
+            msg="main has moved on to ${head:0:7}; not deploying this older commit. The newer run deploys it."
+            echo "::error::$msg"
+            echo "$msg" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
