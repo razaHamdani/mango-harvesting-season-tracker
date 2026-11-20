@@ -5,6 +5,10 @@ import { createClient } from '@/lib/supabase/server'
 import { workerSchema } from '@/lib/utils/validators'
 import { mutationLimiter, enforceLimit } from '@/lib/utils/rate-limiter'
 import { logError } from '@/lib/utils/logger'
+import { isSeasonClosedError } from '@/lib/utils/db-errors'
+
+const WORKER_IN_CLOSED_SEASON =
+  "This worker has salary in a closed season and can't be deleted. Deactivate them instead."
 
 export async function createWorker(formData: FormData) {
   const supabase = await createClient()
@@ -154,12 +158,32 @@ export async function deleteWorker(id: string) {
   const { allowed } = await enforceLimit(mutationLimiter, `user:${user.id}`, true)
   if (!allowed) return { error: { _form: ['Too many requests. Try again shortly.'] } }
 
+  // Deleting a worker sets expenses.worker_id to NULL (ON DELETE SET NULL),
+  // which would rewrite salary rows of closed seasons; the DB refuses that.
+  // Check first so the user gets a reason and a way out.
+  const { count: closedSalaries, error: countError } = await supabase
+    .from('expenses')
+    .select('id, seasons!inner(status)', { count: 'exact', head: true })
+    .eq('worker_id', id)
+    .eq('seasons.status', 'closed')
+
+  if (countError) {
+    await logError('deleteWorker.closedSalaries', countError)
+    return { error: { _form: ['Failed to delete worker.'] } }
+  }
+  if (closedSalaries && closedSalaries > 0) {
+    return { error: { _form: [WORKER_IN_CLOSED_SEASON] } }
+  }
+
   const { error } = await supabase
     .from('workers')
     .delete()
     .eq('id', id)
     .eq('owner_id', user.id)
 
+  if (isSeasonClosedError(error)) {
+    return { error: { _form: [WORKER_IN_CLOSED_SEASON] } }
+  }
   if (error) {
     await logError('deleteWorker.delete', error)
     return { error: { _form: ['Failed to delete worker.'] } }

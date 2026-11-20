@@ -11,10 +11,14 @@ export type GuardResult =
 // Uses lexicographic string comparison — safe for ISO YYYY-MM-DD dates.
 // Caller is expected to have already verified season ownership; this helper
 // only enforces lifecycle + date-window invariants.
+// allowAfterEnd: payments may be dated after the season's end_date
+// (contractors pay after harvest); mirrors the DB trigger, where paid_date
+// has only a lower bound.
 export async function assertWithinSeasonWindow(
   supabase: SupabaseClient,
   seasonId: string,
   date: string,
+  { allowAfterEnd = false }: { allowAfterEnd?: boolean } = {},
 ): Promise<GuardResult> {
   const { data } = await supabase
     .from('seasons')
@@ -36,7 +40,7 @@ export async function assertWithinSeasonWindow(
     }
   }
 
-  if (date > data.end_date) {
+  if (!allowAfterEnd && date > data.end_date) {
     return {
       ok: false,
       error: `Date must be on or before the season end (${data.end_date}).`,

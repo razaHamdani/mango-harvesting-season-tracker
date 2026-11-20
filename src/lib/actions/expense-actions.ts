@@ -10,6 +10,7 @@ import { assertWithinSeasonWindow } from '@/lib/utils/season-date-guard'
 import { assertFarmInSeason } from '@/lib/utils/farm-season-guard'
 import { assertWorkerOwned } from '@/lib/utils/worker-guard'
 import { logError } from '@/lib/utils/logger'
+import { isSeasonClosedError, SEASON_CLOSED_MESSAGE } from '@/lib/utils/db-errors'
 
 export async function createExpense(formData: FormData, seasonId: string) {
   const supabase = await createClient()
@@ -121,6 +122,9 @@ export async function createExpense(formData: FormData, seasonId: string) {
     .select('id')
     .single()
 
+  if (isSeasonClosedError(insertError)) {
+    return { error: SEASON_CLOSED_MESSAGE }
+  }
   if (insertError || !expense) {
     await logError('createExpense.insert', insertError)
     return { error: 'Failed to create expense.' }
@@ -186,6 +190,11 @@ export async function deleteExpense(expenseId: string, seasonId: string) {
     .eq('id', expenseId)
     .eq('season_id', seasonId)
 
+  // The season was closed after the status check above (the DB trigger is
+  // the authority; the check above only gives the common case a clear message).
+  if (isSeasonClosedError(error)) {
+    return { error: 'Records of a closed season cannot be deleted.' }
+  }
   if (error) {
     await logError('deleteExpense.delete', error)
     return { error: 'Failed to delete expense.' }

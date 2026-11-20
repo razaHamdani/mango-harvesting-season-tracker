@@ -265,10 +265,26 @@ describe('season date guard — activities, expenses, payments', () => {
     expect((await childCounts()).expenses).toBe(0)
   })
 
-  it('rejects a payment dated after end_date', async () => {
+  // Contractors pay after harvest: paid_date has no upper bound (D7,
+  // 20261120120000_closed_season_frozen.sql). due_date keeps both.
+  it('accepts a payment dated after end_date', async () => {
     setCurrentClient(user.client)
     const result = await recordPayment(installmentId, paymentForm('2026-07-01'), seasonId)
-    expect(result).toEqual({ error: 'Date must be on or before the season end (2026-06-30).' })
+    expect(result).toEqual({ success: true })
+
+    const { data: row } = await admin
+      .from('installments')
+      .select('paid_date')
+      .eq('id', installmentId)
+      .single()
+    expect(row?.paid_date).toBe('2026-07-01')
+
+    // Unpay it again so the next test starts from an unpaid installment.
+    const { error: resetErr } = await admin
+      .from('installments')
+      .update({ paid_amount: null, paid_date: null })
+      .eq('id', installmentId)
+    expect(resetErr).toBeNull()
   })
 
   it('rejects a payment dated before start_date', async () => {
