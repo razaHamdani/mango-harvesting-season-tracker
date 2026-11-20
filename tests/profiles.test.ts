@@ -92,7 +92,11 @@ describe('profiles', () => {
       .update({ role: 'admin' })
       .eq('id', user.id)
 
+    // Column privilege (20261120120200_profile_role_lockdown.sql): signed-in
+    // users may not update `role` at all, so this fails before the
+    // prevent_role_self_edit trigger runs. The trigger layer is covered in
+    // tests/db-integrity.test.ts.
     expect(error).not.toBeNull()
-    expect(error!.message).toMatch(/role can only be changed by admin/i)
+    expect(error!.code).toBe('42501')
   })
 })

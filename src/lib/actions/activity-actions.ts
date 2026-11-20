@@ -8,6 +8,7 @@ import { mutationLimiter, enforceLimit } from '@/lib/utils/rate-limiter'
 import { assertWithinSeasonWindow } from '@/lib/utils/season-date-guard'
 import { assertFarmInSeason } from '@/lib/utils/farm-season-guard'
 import { logError } from '@/lib/utils/logger'
+import { isSeasonClosedError, SEASON_CLOSED_MESSAGE } from '@/lib/utils/db-errors'
 
 export async function createActivity(formData: FormData, seasonId: string) {
   if (!seasonId) {
@@ -84,6 +85,9 @@ export async function createActivity(formData: FormData, seasonId: string) {
     .select('id')
     .single()
 
+  if (isSeasonClosedError(insertError)) {
+    return { error: SEASON_CLOSED_MESSAGE }
+  }
   if (insertError || !activity) {
     await logError('createActivity.insert', insertError)
     return { error: 'Failed to create activity.' }
@@ -148,6 +152,11 @@ export async function deleteActivity(activityId: string, seasonId: string) {
     .eq('id', activityId)
     .eq('season_id', seasonId)
 
+  // The season was closed after the status check above (the DB trigger is
+  // the authority; the check above only gives the common case a clear message).
+  if (isSeasonClosedError(error)) {
+    return { error: 'Records of a closed season cannot be deleted.' }
+  }
   if (error) {
     await logError('deleteActivity.delete', error)
     return { error: 'Failed to delete activity.' }

@@ -2,7 +2,7 @@
 
 ## Currently Working On
 
-Out-of-plan CI change (owner request): lint/tests/build run on PRs only, push to main goes straight to the pending-migrations check — branch `ci-skip-rerun-on-main`, PR open. P2 merged (#25). Next: P1 (owner creates migration_checker role and environments first).
+P3 (DB-enforced integrity) — implemented on branch `db-integrity`: 3 migrations + app + tests, local gate green (236 tests). In review, then PR. Release needs owner: backup confirmed, then approve the 3 migrations within 1h after merge, then smoke check.
 
 ## Completed
 
@@ -79,7 +79,6 @@ Out-of-plan CI change (owner request): lint/tests/build run on PRs only, push to
 
 ## Remaining
 
-- [ ] P1 — Owner: create migration_checker role + production-db / production-db-check environments (branch main, reviewer, no admin bypass); ci.yml: check job on read-only URL, approve job merged into migrate, db push --remote=<url>; runbook; gate (PR has no secrets, main check green); then delete repo secrets + revoke access token
 - [ ] P3 — Owner: backup + read-only prod audits (roles, cross-owner links); migrations P3a closed-season trigger + paid_date upper bound dropped, P3b restrictive ownership policies, P3c profile role lockdown; app: date-guard flag, deleteWorker pre-check, 55000 mapping, ensureProfile without role; tests/db-integrity.test.ts
 
 - [ ] Post-launch cleanup: `computeStatuses` in installment-schedule.tsx derives the "overdue" badge from UTC today (display-only cousin of C4) — noted in the S1–S3 plan, not fixed there.
@@ -93,10 +92,13 @@ Out-of-plan CI change (owner request): lint/tests/build run on PRs only, push to
 
 ## Decisions & Deviations
 
-- 2026-11-20: Out-of-plan, owner request — lint, tests and build no longer rerun on push to main; `pending-migrations` no longer needs them. Safe only while branch protection requires those checks and up-to-date branches (runbook Branch Protection); a direct push to main would now reach the migration check untested. P1 will rework the same jobs and must keep this.
+- 2026-11-20: P3 — owner approved the P3-only PLAN.md and reported running read-only production checks A–E; results were not shared, taken as clean (B, C = 0; tables owned by postgres; no forced RLS).
+- 2026-11-20: P3 — test fixtures must close a season before creating the next: `one_active_season_per_owner` allows one active season per owner.
+- 2026-11-20: Owner dropped P1 (CI credential isolation): repo-level prod secrets and the current approve-then-migrate flow stay. PLAN.md replanned to P3 only; P3 releases through the existing flow, rollback fallback from the owner machine.
+- 2026-11-20: Out-of-plan, owner request — lint, tests and build no longer rerun on push to main; `pending-migrations` no longer needs them. Safe only while branch protection requires those checks and up-to-date branches (runbook Branch Protection); a direct push to main would now reach the migration check untested.
 - 2026-11-20: P2 deviation — DB marker is `COMMENT ON DATABASE postgres` instead of a custom setting: `ALTER DATABASE … SET app.*` is refused for `postgres` on local PG 17 (42501), and the ALTER ROLE fallback needs the same privilege. The comment needs only ownership and is in no schema diff.
 - 2026-11-20: P2 — `supabase status` 3.2.0 drops API_URL and names the sb_ service key SECRET_KEY; global-setup accepts API_URL or the STORAGE_S3_URL origin, and SERVICE_ROLE_KEY or SECRET_KEY. CI (3.1.0) still writes API_URL/SERVICE_ROLE_KEY into .env.test (ci.yml:52-62); bumping the CI pin to 3.2.0 would break that writer.
-- 2026-11-20: Plan order P2 → P1 → P3; decisions D1–D8 in PLAN.md. D7 (paid_date may fall after season end_date) chosen by owner. D6 (closed = fully frozen in DB, mirroring the app) is the default pending owner confirmation — the question was left unanswered. D8 (block deleting a worker with closed-season salary) from the product agent.
+- 2026-11-20: Plan order P2 → P1 → P3; decisions D1–D8 in PLAN.md. D7 (paid_date may fall after season end_date) chosen by owner. D6 (closed = fully frozen in DB, mirroring the app) — confirmed by the owner approving the P3-only PLAN.md, which states it as a decision. D8 (block deleting a worker with closed-season salary) from the product agent.
 - 2026-11-20: Plan review (WARN) folded in:
   - `migrate` keeps `cancel-in-progress: false`; true would kill a running
     `db push`.

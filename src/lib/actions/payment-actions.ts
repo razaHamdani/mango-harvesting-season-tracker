@@ -7,6 +7,7 @@ import { mutationLimiter, enforceLimit } from '@/lib/utils/rate-limiter'
 import { assertWithinSeasonWindow } from '@/lib/utils/season-date-guard'
 import { paymentSchema } from '@/lib/utils/validators'
 import { logError } from '@/lib/utils/logger'
+import { isSeasonClosedError, SEASON_CLOSED_MESSAGE } from '@/lib/utils/db-errors'
 
 export async function recordPayment(
   installmentId: string,
@@ -48,7 +49,9 @@ export async function recordPayment(
   const { amount, paid_date: paidDate, notes: rawNotes } = parsed.data
   const notes = rawNotes || null
 
-  const guard = await assertWithinSeasonWindow(supabase, seasonId, paidDate)
+  const guard = await assertWithinSeasonWindow(supabase, seasonId, paidDate, {
+    allowAfterEnd: true,
+  })
   if (!guard.ok) {
     return { error: guard.error }
   }
@@ -74,6 +77,9 @@ export async function recordPayment(
     .is('paid_amount', null)
     .select('id')
 
+  if (isSeasonClosedError(updateError)) {
+    return { error: SEASON_CLOSED_MESSAGE }
+  }
   if (updateError) {
     await logError('recordPayment.update', updateError)
     return { error: 'Failed to record payment.' }
