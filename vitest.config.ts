@@ -7,7 +7,9 @@ const here = dirname(fileURLToPath(import.meta.url))
 
 // Load .env.test BEFORE the config object is built, so the values are
 // visible when Next.js / our server code reads process.env at import time.
-loadEnv({ path: resolve(here, '.env.test') })
+// override: a production URL left in the shell must not win over .env.test.
+// The real control is tests/helpers/target-guard.ts.
+loadEnv({ path: resolve(here, '.env.test'), override: true })
 
 export default defineConfig({
   test: {
@@ -15,6 +17,7 @@ export default defineConfig({
     globals: false,
     include: ['tests/**/*.test.ts'],
     setupFiles: ['tests/setup.ts'],
+    globalSetup: ['tests/global-setup.ts'],
     testTimeout: 20_000,
     hookTimeout: 30_000,
     // Tests mutate shared DB state; run them serially for determinism.
