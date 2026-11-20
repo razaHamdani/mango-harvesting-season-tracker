@@ -2,7 +2,7 @@
 
 ## Currently Working On
 
-P2 (test-DB guard) — done on branch `test-db-guard`, PR open; waiting for CI green + merge. Next: P1 (owner creates migration_checker role and environments first).
+Out-of-plan CI change (owner request): lint/tests/build run on PRs only, push to main goes straight to the pending-migrations check — branch `ci-skip-rerun-on-main`, PR open. P2 merged (#25). Next: P1 (owner creates migration_checker role and environments first).
 
 ## Completed
 
@@ -93,6 +93,7 @@ P2 (test-DB guard) — done on branch `test-db-guard`, PR open; waiting for CI g
 
 ## Decisions & Deviations
 
+- 2026-11-20: Out-of-plan, owner request — lint, tests and build no longer rerun on push to main; `pending-migrations` no longer needs them. Safe only while branch protection requires those checks and up-to-date branches (runbook Branch Protection); a direct push to main would now reach the migration check untested. P1 will rework the same jobs and must keep this.
 - 2026-11-20: P2 deviation — DB marker is `COMMENT ON DATABASE postgres` instead of a custom setting: `ALTER DATABASE … SET app.*` is refused for `postgres` on local PG 17 (42501), and the ALTER ROLE fallback needs the same privilege. The comment needs only ownership and is in no schema diff.
 - 2026-11-20: P2 — `supabase status` 3.2.0 drops API_URL and names the sb_ service key SECRET_KEY; global-setup accepts API_URL or the STORAGE_S3_URL origin, and SERVICE_ROLE_KEY or SECRET_KEY. CI (3.1.0) still writes API_URL/SERVICE_ROLE_KEY into .env.test (ci.yml:52-62); bumping the CI pin to 3.2.0 would break that writer.
 - 2026-11-20: Plan order P2 → P1 → P3; decisions D1–D8 in PLAN.md. D7 (paid_date may fall after season end_date) chosen by owner. D6 (closed = fully frozen in DB, mirroring the app) is the default pending owner confirmation — the question was left unanswered. D8 (block deleting a worker with closed-season salary) from the product agent.
