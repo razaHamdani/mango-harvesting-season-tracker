@@ -59,7 +59,11 @@ for approval; **no answer within 1 hour means no migration and no deploy.**
 1. **PR** — `Integration Tests` applies every migration to a fresh local
    database and runs the suite against it; `Lint & Type-check` runs the
    migration safety lint (`node scripts/check-migrations.mjs`).
-2. **Merge to `main`** — lint, tests and build run again on `main`.
+2. **Merge to `main`** — lint, tests and build do **not** run again: they
+   are PR-only, and they show as skipped on `main`. The merged code already
+   passed them, because branch protection (below) requires those checks and
+   requires the branch to be up to date with `main` before merging. The run
+   goes straight to step 3.
 3. **`Check pending production migrations`** — a read-only
    `supabase db push --remote --dry-run` against production. Nothing
    pending: the migrate job is skipped, the run is green, Railway deploys.

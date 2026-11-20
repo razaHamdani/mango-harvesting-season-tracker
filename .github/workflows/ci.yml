@@ -14,8 +14,14 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # Lint, tests and build run on pull requests only. The same code already
+  # passed them on its PR, so a push to main goes straight to the production
+  # migration check. This relies on main accepting changes only through PRs
+  # that are up to date with main (branch protection: required checks +
+  # "Require branches to be up to date before merging").
   lint-typecheck:
     name: Lint & Type-check
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -32,6 +38,7 @@ jobs:
 
   test:
     name: Integration Tests
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -73,6 +80,7 @@ jobs:
 
   build:
     name: Build
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -92,12 +100,11 @@ jobs:
           UPSTASH_REDIS_REST_URL: ""
           UPSTASH_REDIS_REST_TOKEN: ""
 
-  # On every push to main, after lint, tests and build pass, asks production
-  # (read-only dry run) whether any migrations are pending. Nothing pending:
-  # the migrate job is skipped and the run stays green.
+  # On every push to main, asks production (read-only dry run) whether any
+  # migrations are pending. Nothing pending: the migrate job is skipped and
+  # the run stays green. Lint, tests and build already passed on the PR.
   pending-migrations:
     name: Check pending production migrations
-    needs: [lint-typecheck, test, build]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 5
