@@ -2,21 +2,12 @@
 
 ## Currently Working On
 
-Nothing — payment shortfall visibility S1–S3 (PLAN.md 2026-06-12) complete and pushed. Review item #12 fully resolved.
+P2 (test-DB guard) — done on branch `test-db-guard`, PR open; waiting for CI green + merge. Next: P1 (owner creates migration_checker role and environments first).
 
 ## Completed
 
-- [x] Phase S3 (close path counts underpaid) — `closeSeason` swaps the null-only head-count for `select('expected_amount, paid_amount')` + `summarizeInstallments` + `buildCloseWarning` (return shape unchanged; 5D.7 test still matches); `SeasonActionButtons` `unpaidCount` prop replaced by `shortfall: InstallmentSummary`, confirm text built with the shared `buildCloseWarning`; both render sites pass `summarizeInstallments(season.installments)` (rows already fetched by getSeasonById — replaces the insights-derived count which couldn't see underpayment); 1 new integration test (short-paid installment → exact warning "1 installment underpaid (short Rs. 20,000)."); 162 tests passing; tsc clean
-- [x] Phase S2 (payments tab gap display) — schedule rows recorded short get a "Short Rs. X" badge (overdue variant) next to "Paid"; payments KPI strip uses `summarizeInstallments` and appends "N underpaid (short Rs. X)" when present; payment form shows a non-blocking "Rs. X short of expected — will be recorded as-is" hint when the entered amount is below expected; display glue only, no new tests per plan; 161 tests passing; tsc clean
-- [x] Phase S1 (shortfall helper) — new `src/lib/utils/installment-shortfall.ts`: `summarizeInstallments()` → `{ unpaidCount, underpaidCount, shortfallTotal }` (unpaid = null, underpaid = paid < expected, overpayment ignored) + `buildCloseWarning()` shared wording for server action and client confirm; 12 unit tests in tests/installment-shortfall.test.ts; 161 tests passing; tsc clean
-- [x] Phase R4 (closeSeason warning pre-close) — `SeasonActionButtons` gains optional `unpaidCount` prop; close confirm now reads "N installment(s) still unpaid. Closing is permanent — records become read-only. Close this season?"; both render sites pass the count derived from already-fetched insights (`installments_total - installments_paid` — zero new queries); post-close `result.warning` surfaced via alert as stale-count backup; 149 tests passing; tsc clean
-- [x] Phase R3 (dashboard insights failure state) — `getDashboardData` logs RPC errors via logError and returns `insights: null` (type now `SeasonInsights | null`) instead of a zeroed fallback object; dashboard page derives `insights` once, renders an explicit "Couldn't load season insights" card replacing the hero + KPI strip when null (feed/farms/quick-actions still render — independent queries); 2 new tests in tests/dashboard-insights.test.ts via chainable-thenable stub client; 149 tests passing; tsc clean
-- [x] Phase R2 (rate-limiter correctness) — proxy.ts `/login` POST rate-limit block removed (actions each enforce authLimiter; double-count halved the documented budget); `signUpUser` rate check moved above the `hasMxRecords` DNS lookup; dead `getClientIp(request)` removed from client-ip.ts (proxy was sole caller) + 3 test mocks cleaned; `TRUSTED_XFF` documented in .env.example with Vercel note; 1 new test (limiter blocks before MX lookup, via vi.hoisted spy); 147 tests passing; tsc clean
-- [x] Phase R1 (season lifecycle races) — compare-and-set on all three season transitions: `deleteSeason` DELETE + `.eq('status','draft')`, `closeSeason` UPDATE + `.eq('status','active')`, `activateSeason` UPDATE + `.eq('status','draft')` (added beyond plan: without it a delete-wins race made activate report false success); all three `.select('id')` and treat 0 rows as a status error; 3 new tests (activate-vs-delete race with both-outcome assertions, concurrent double close, delete-after-activate); 146 tests passing; tsc clean
-- [x] Phase B4 (C2 closed-season immutability) — `deleteExpense` and `deleteActivity` Step-1 ownership query extended to `select('id, status')`; deletes rejected with "Records of a closed season cannot be deleted." when status='closed' (zero extra queries; draft seasons can't contain records so only closed needs blocking); 2 new tests in tests/closed-season-immutability.test.ts (both deletes rejected, rows survive); 143 tests passing; tsc clean
-- [x] Phase B3 (C4 business-timezone "today") — new `src/lib/utils/app-date.ts` `todayInAppTz()` (APP_TIMEZONE env, default Asia/Karachi, en-CA Intl format); wired into `assertWithinSeasonWindow` future-date cap and `activateSeason` started_at stamp; APP_TIMEZONE documented in .env.example; seasons.test.ts started_at assertion switched to todayInAppTz() (UTC expectation would go flaky 19:00–24:00 UTC); 5 new tests in tests/app-date.test.ts (Karachi rollover at 21:00 UTC, UTC-agreement, env override, guard accepts Karachi-today/rejects Karachi-tomorrow via fake Date + stub client); 141 tests passing; tsc clean
-- [x] Phase B2 (C3 date hardening) — `z.iso.date()` replaces `z.string().min(1)` on `due_date`, `activity_date`, `expense_date`, `paid_date` in validators.ts; closes the unpadded-date window bypass ('2026-06-1' sorted after '2026-06-05' lexicographically but parses to June 1) and rejects calendar-invalid dates; 5 new tests (bypass + no-insert, 2026-02-30, well-formed accepted, unpadded activity date, unpadded paid_date); 136 tests passing; tsc clean
-- [x] Phase B1 (C1 observability) — `captureConsoleIntegration({ levels: ['error'] })` added to sentry.server.config.ts + sentry.edge.config.ts (export verified in installed @sentry/node and @sentry/vercel-edge); false "console.error is captured" comments fixed; all 24 server-side `console.error` sites in actions, guards, photo util, and auth callback route swept to `logError(scope, err)` with dotted scopes (`action.step`); remaining console.error sites are intentional (rate-limiter module scope, client error boundary, logger itself); 5 new tests (tests/logger.test.ts, tests/sentry-config.test.ts); 131 tests passing; tsc clean
+- [x] P2 — Test-DB guard: `tests/helpers/target-guard.ts` (exact host/port/path, no host/hostaddr query, value-free errors; DB marker check), `supabase/seed.sql` marks the local DB, `tests/global-setup.ts` matches .env.test to the running stack via `supabase status`, `env.ts` checks at import, `resetDb` re-checks before TRUNCATE, dotenv `override: true`; `tests/target-guard.test.ts` (17 cases). 212 tests passing; gate: non-local shell var overridden, fake host in .env.test aborts, stopped stack aborts
+- [x] Production blockers C1–C4 (B1–B4) + review follow-ups R1–R4 + payment shortfall S1–S3 — previous PLAN.md, all on main; per-phase detail in git history of TASKS.md
 
 - [x] Runtime test harness (PLAN.md) — RC-2 TOCTOU (`payments.test.ts`), RC-1 atomicity (`seasons.test.ts`), PHOTO-1 namespace validation (`photos.test.ts`); all 3 scenarios implemented; 126 tests passing; tsc clean; verified 2026-05-18
 
@@ -88,6 +79,9 @@ Nothing — payment shortfall visibility S1–S3 (PLAN.md 2026-06-12) complete a
 
 ## Remaining
 
+- [ ] P1 — Owner: create migration_checker role + production-db / production-db-check environments (branch main, reviewer, no admin bypass); ci.yml: check job on read-only URL, approve job merged into migrate, db push --remote=<url>; runbook; gate (PR has no secrets, main check green); then delete repo secrets + revoke access token
+- [ ] P3 — Owner: backup + read-only prod audits (roles, cross-owner links); migrations P3a closed-season trigger + paid_date upper bound dropped, P3b restrictive ownership policies, P3c profile role lockdown; app: date-guard flag, deleteWorker pre-check, 55000 mapping, ensureProfile without role; tests/db-integrity.test.ts
+
 - [ ] Post-launch cleanup: `computeStatuses` in installment-schedule.tsx derives the "overdue" badge from UTC today (display-only cousin of C4) — noted in the S1–S3 plan, not fixed there.
 
 - [ ] Phase 3.2: PostgREST aggregate for `getExpenseTotals` — requires Docker/Supabase running to verify aggregate syntax support
@@ -98,6 +92,21 @@ Nothing — payment shortfall visibility S1–S3 (PLAN.md 2026-06-12) complete a
 - 2026-04-28: Phase 6D.4 (audit log UI) deferred per plan — wait for real data before designing the activity history page.
 
 ## Decisions & Deviations
+
+- 2026-11-20: P2 deviation — DB marker is `COMMENT ON DATABASE postgres` instead of a custom setting: `ALTER DATABASE … SET app.*` is refused for `postgres` on local PG 17 (42501), and the ALTER ROLE fallback needs the same privilege. The comment needs only ownership and is in no schema diff.
+- 2026-11-20: P2 — `supabase status` 3.2.0 drops API_URL and names the sb_ service key SECRET_KEY; global-setup accepts API_URL or the STORAGE_S3_URL origin, and SERVICE_ROLE_KEY or SECRET_KEY. CI (3.1.0) still writes API_URL/SERVICE_ROLE_KEY into .env.test (ci.yml:52-62); bumping the CI pin to 3.2.0 would break that writer.
+- 2026-11-20: Plan order P2 → P1 → P3; decisions D1–D8 in PLAN.md. D7 (paid_date may fall after season end_date) chosen by owner. D6 (closed = fully frozen in DB, mirroring the app) is the default pending owner confirmation — the question was left unanswered. D8 (block deleting a worker with closed-season salary) from the product agent.
+- 2026-11-20: Plan review (WARN) folded in:
+  - `migrate` keeps `cancel-in-progress: false`; true would kill a running
+    `db push`.
+  - Gate (i) references the environments directly from a throwaway PR.
+  - `--remote=<url>` verified in CLI 3.1.0 and 3.2.0; there is no
+    `--db-url`. The pin stays.
+  - `season-date-range.test.ts:268` inverted; `profiles.test.ts:89` now
+    expects 42501, with a raw-pg trigger test.
+  - Table-owner and force-RLS audits added.
+  - Fallback rollback path if `migrate` is broken.
+- 2026-11-20: Correction — the review said create/payment paths do not check season status; they do, via assertWithinSeasonWindow (status must be active). Only the DB layer lacks enforcement.
 
 - 2026-06-12: Payment-settle question (review #12) decided — option 3: keep single-payment model, record short amounts as-is, surface unpaid vs underpaid (with PKR shortfall) in the schedule, payments KPIs, payment form hint, closeSeason warning, and close confirm. Enforcement (opt 1) and partial-payment ledger (opt 2) rejected.
 - 2026-06-12: R3 — the two pre-existing `Date.now()` react-hooks/purity lint errors in dashboard/page.tsx were fixed opportunistically in the R3 commit (file was hot): clock snapshotted once with a scoped eslint-disable (async RSC renders once per request, so the rule's re-render drift premise doesn't apply).
