@@ -15,7 +15,8 @@ export async function ensureProfile(): Promise<void> {
       id: user.id,
       full_name: user.user_metadata?.full_name ?? '',
       email: user.email ?? '',
-      role: user.user_metadata?.role ?? 'landlord',
+      // role is not sent: the column default ('landlord') applies, and the
+      // INSERT policy accepts nothing else. user_metadata is user-controlled.
     },
     { onConflict: 'id', ignoreDuplicates: true }
   )
